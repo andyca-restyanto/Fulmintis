@@ -8,39 +8,47 @@ const ACCESS_TOKEN_KEY = 'access_token';
 const EXPIRY_SKEW_SECONDS = 10;
 
 /**
- * Baca klaim "exp" (detik epoch) dari payload JWT TANPA memverifikasi tanda
- * tangan -- FE memang tidak (dan tidak boleh) punya secret-nya. Ini murni
- * untuk UX (tidak menampilkan halaman yang pasti berujung 401); keputusan
- * akses SEBENARNYA tetap di backend (JwtAuthenticationFilter).
+ * Decode payload JWT TANPA memverifikasi tanda tangan -- FE memang tidak (dan tidak boleh)
+ * punya secret-nya. Semua pembacaan klaim di file ini murni untuk UX (tidak menampilkan halaman
+ * yang pasti berujung 401/403); keputusan akses SEBENARNYA tetap di backend (JwtAuthenticationFilter
+ * + SecurityConfig).
  */
-function readExpiry(token: string): number | null {
+function decodePayload(token: string): Record<string, unknown> | null {
   try {
     const payloadPart = token.split('.')[1];
     if (!payloadPart) return null;
     const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
-    return typeof payload.exp === 'number' ? payload.exp : null;
+    const payload: unknown = JSON.parse(atob(padded));
+    return typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : null;
   } catch {
     return null;
   }
 }
 
-/**
- * Klaim "sub" (email user) dari payload JWT -- UX saja (mis. mengenali job milik sendiri di riwayat),
- * TIDAK PERNAH dasar keputusan akses. Tanda tangan tidak diverifikasi (FE tidak punya secret-nya).
- */
+/** Klaim "exp" (detik epoch), atau null. */
+function readExpiry(token: string): number | null {
+  const exp = decodePayload(token)?.exp;
+  return typeof exp === 'number' ? exp : null;
+}
+
+/** Klaim "sub" (email user) -- UX saja (mis. mengenali job milik sendiri di riwayat). */
 function readSubject(token: string): string | null {
-  try {
-    const payloadPart = token.split('.')[1];
-    if (!payloadPart) return null;
-    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const payload = JSON.parse(atob(padded)) as { sub?: unknown };
-    return typeof payload.sub === 'string' ? payload.sub : null;
-  } catch {
-    return null;
-  }
+  const sub = decodePayload(token)?.sub;
+  return typeof sub === 'string' ? sub : null;
+}
+
+export type AppRole = 'USER' | 'ADMIN';
+
+/**
+ * Klaim "role". Token lama (sebelum fitur admin) tidak punya klaim ini -> USER.
+ * Token yang tidak terbaca -> null. Hanya untuk memilih dashboard/redirect di FE;
+ * backend menentukan peran dari database, bukan dari klaim ini.
+ */
+function readRole(token: string): AppRole | null {
+  const payload = decodePayload(token);
+  if (!payload) return null;
+  return payload.role === 'ADMIN' ? 'ADMIN' : 'USER';
 }
 
 export const tokenStorage = {
@@ -58,6 +66,12 @@ export const tokenStorage = {
   getTokenSubject(): string | null {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     return token ? readSubject(token) : null;
+  },
+
+  /** Peran sesi saat ini ("USER" | "ADMIN"), atau null kalau tidak ada token / token tidak terbaca. Bukan keputusan akses. */
+  getRole(): AppRole | null {
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    return token ? readRole(token) : null;
   },
 
   /** true kalau ada token TAPI sudah kedaluwarsa (atau tidak terbaca). */

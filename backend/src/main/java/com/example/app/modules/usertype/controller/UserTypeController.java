@@ -1,6 +1,7 @@
 // backend/src/main/java/com/example/app/modules/usertype/controller/UserTypeController.java
 package com.example.app.modules.usertype.controller;
 
+import com.example.app.modules.usertype.UserTypeCode;
 import com.example.app.modules.usertype.dto.UserTypeResponseDTO;
 import com.example.app.modules.usertype.entity.UserType;
 import com.example.app.modules.usertype.repository.UserTypeRepository;
@@ -18,10 +19,13 @@ public class UserTypeController {
 
     private final UserTypeRepository userTypeRepository;
 
-    /** Berguna untuk populate dropdown di frontend (misal halaman upgrade akun). */
+    /**
+     * Berguna untuk populate dropdown di frontend (misal halaman upgrade akun).
+     * Tipe ADMIN sengaja TIDAK disertakan: itu bukan pilihan yang boleh dilihat/dipilih user.
+     */
     @GetMapping
     public List<UserTypeResponseDTO> getAll() {
-        return userTypeRepository.findAllByOrderBySortOrderAsc().stream()
+        return userTypeRepository.findAllByCodeNotOrderBySortOrderAsc(UserTypeCode.ADMIN).stream()
                 .map(this::toDto)
                 .toList();
     }

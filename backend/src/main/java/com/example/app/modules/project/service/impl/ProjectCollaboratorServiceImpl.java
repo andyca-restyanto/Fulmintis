@@ -18,6 +18,7 @@ import com.example.app.modules.project.repository.ProjectCollaborationRepository
 import com.example.app.modules.project.service.ProjectAccessService;
 import com.example.app.modules.project.service.ProjectCollaboratorService;
 import com.example.app.modules.projectteam.ProjectTeamCode;
+import com.example.app.modules.usertype.UserTypeCode;
 import com.example.app.modules.projectteam.repository.ProjectTeamRepository;
 import com.example.app.shared.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class ProjectCollaboratorServiceImpl implements ProjectCollaboratorServic
             return List.of(); // bukan email utuh -> tidak dicari sama sekali
         }
 
-        Optional<User> match = userRepository.findByEmailAndVerifiedTrue(email);
+        Optional<User> match = userRepository.findByEmailAndVerifiedTrueAndUserTypeNot(email, UserTypeCode.ADMIN);
         if (match.isEmpty()) {
             return List.of();
         }
@@ -110,7 +111,7 @@ public class ProjectCollaboratorServiceImpl implements ProjectCollaboratorServic
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         // Hanya user verified -- akun yang belum verifikasi email tidak bisa
         // ditambahkan (dan dibalas sama dengan "tidak terdaftar").
-        User targetUser = userRepository.findByEmailAndVerifiedTrue(normalizedEmail)
+        User targetUser = userRepository.findByEmailAndVerifiedTrueAndUserTypeNot(normalizedEmail, UserTypeCode.ADMIN)
                 .orElseThrow(CollaboratorNotFoundException::new);
 
         boolean alreadyMember = projectCollaborationRepository

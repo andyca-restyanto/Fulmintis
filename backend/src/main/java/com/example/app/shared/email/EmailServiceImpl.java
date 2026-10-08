@@ -71,6 +71,23 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+    @Override
+    public void sendAdminInvitationEmail(String toEmail, String name, String invitationLink, String invitedBy) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+
+            helper.setFrom(buildFromAddress());
+            helper.setTo(toEmail);
+            helper.setSubject("Undangan Admin " + brand());
+            helper.setText(buildAdminInvitationHtmlBody(name, invitationLink, invitedBy), true);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            log.error("Gagal mengirim email undangan admin ke {}: {}", toEmail, e.getMessage());
+        }
+    }
+
     /** Nama produk; kalau properti dikosongkan, kembali ke default (bukan email tanpa nama). */
     private String brand() {
         return (brandName == null || brandName.isBlank()) ? DEFAULT_BRAND_NAME : brandName.trim();
@@ -124,6 +141,34 @@ public class EmailServiceImpl implements EmailService {
                     </p>
                 </div>
                 """.formatted(brand, verificationLink);
+    }
+
+    // Nama & email pengundang berasal dari input user -> di-escape sebelum masuk HTML.
+    private String buildAdminInvitationHtmlBody(String name, String invitationLink, String invitedBy) {
+        String brand = HtmlUtils.htmlEscape(brand());
+        String safeName = HtmlUtils.htmlEscape(name == null || name.isBlank() ? "" : name.trim());
+        String safeInviter = HtmlUtils.htmlEscape(invitedBy == null ? "" : invitedBy);
+        return """
+                <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                    <p style="margin: 0 0 24px; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; color:#111827;">%1$s</p>
+                    <h2>Undangan Admin %1$s</h2>
+                    <p>Halo %3$s, %4$s mengundang kamu menjadi admin di %1$s. Klik tombol di bawah
+                       untuk membuat password dan mengaktifkan akun admin kamu:</p>
+                    <p style="margin: 24px 0;">
+                        <a href="%2$s"
+                           style="background:#111827;color:#ffffff;padding:12px 24px;
+                                  border-radius:8px;text-decoration:none;display:inline-block;">
+                            Buat Password Admin
+                        </a>
+                    </p>
+                    <p>Atau salin link berikut ke browser kamu:</p>
+                    <p style="word-break: break-all; color:#6b7280;">%2$s</p>
+                    <p style="color:#9ca3af; font-size: 12px; margin-top:32px;">
+                        Link ini berlaku selama 24 jam dan hanya bisa dipakai sekali. Kalau kamu tidak
+                        merasa diundang, abaikan email ini.
+                    </p>
+                </div>
+                """.formatted(brand, invitationLink, safeName, safeInviter);
     }
 
     private String buildResetPasswordHtmlBody(String resetLink) {

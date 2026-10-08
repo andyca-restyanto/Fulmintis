@@ -44,6 +44,12 @@ async function handleSubmit() {
   isSubmitting.value = true;
   try {
     const response = await authService.login(form.value);
+    // Backend sudah menolak akun admin di endpoint ini (401). Lapis kedua di FE: kalau tetap
+    // ada respons ber-role ADMIN, JANGAN simpan token -- admin login lewat /admin/signin.
+    if (response.role === 'ADMIN') {
+      generalError.value = 'Email atau password salah';
+      return;
+    }
     tokenStorage.setToken(response.accessToken);
     router.push({ name: 'dashboard' });
   } catch (err) {

@@ -50,6 +50,15 @@ public class User {
     @Column(name = "reset_password_token_expires_at")
     private LocalDateTime resetPasswordTokenExpiresAt;
 
+    // ---- Undangan admin (diisi AdminManagementService.invite) ----
+    // Token + masa berlaku terpisah dari verification/reset-password supaya
+    // endpoint verifikasi/reset user biasa tidak bisa memakai token undangan.
+    @Column(name = "admin_invitation_token")
+    private String adminInvitationToken;
+
+    @Column(name = "admin_invitation_expires_at")
+    private LocalDateTime adminInvitationExpiresAt;
+
     // ---- User type ----
     // Menyimpan KODE dari master_data (contoh: "FREE", "VIP_MONTHLY").
     // BUKAN relasi JPA (@ManyToOne) karena master_data ada di DATABASE

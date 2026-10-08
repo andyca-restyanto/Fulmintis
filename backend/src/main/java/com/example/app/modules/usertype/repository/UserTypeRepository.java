@@ -10,6 +10,9 @@ import java.util.Optional;
 
 public interface UserTypeRepository extends JpaRepository<UserType, Long> {
     List<UserType> findAllByOrderBySortOrderAsc();
+
+    /** Semua tipe KECUALI {@code code} -- dipakai untuk menyembunyikan ADMIN dari dropdown publik. */
+    List<UserType> findAllByCodeNotOrderBySortOrderAsc(String code);
     Optional<UserType> findByCode(String code);
     boolean existsByCode(String code);
 

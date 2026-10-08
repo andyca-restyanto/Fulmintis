@@ -26,6 +26,7 @@ import com.example.app.modules.usertype.repository.UserTypeRepository;
 import com.example.app.shared.activitylog.ActivityLogService;
 import com.example.app.shared.email.EmailService;
 import com.example.app.shared.security.JwtService;
+import com.example.app.shared.security.Roles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -115,18 +116,20 @@ public class AuthServiceImpl implements AuthService {
         Optional<User> maybeUser = userRepository.findByVerificationToken(token);
 
         if (maybeUser.isEmpty()) {
-            return buildRedirectUrl(EmailVerificationResult.INVALID);
+            return buildRedirectUrl(EmailVerificationResult.INVALID, USER_SIGNIN_PATH);
         }
 
         User user = maybeUser.get();
 
+        String signinPath = signinPathFor(user);
+
         if (user.isVerified()) {
-            return buildRedirectUrl(EmailVerificationResult.ALREADY_VERIFIED);
+            return buildRedirectUrl(EmailVerificationResult.ALREADY_VERIFIED, signinPath);
         }
 
         if (user.getVerificationTokenExpiresAt() == null
                 || user.getVerificationTokenExpiresAt().isBefore(LocalDateTime.now())) {
-            return buildRedirectUrl(EmailVerificationResult.EXPIRED);
+            return buildRedirectUrl(EmailVerificationResult.EXPIRED, signinPath);
         }
 
         user.setVerified(true);
@@ -136,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
 
         activityLogService.log(user.getEmail(), "VERIFY_EMAIL");
 
-        return buildRedirectUrl(EmailVerificationResult.SUCCESS);
+        return buildRedirectUrl(EmailVerificationResult.SUCCESS, signinPath);
     }
 
     @Override
@@ -151,6 +154,13 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException();
         }
 
+        // Akun ADMIN tidak boleh masuk lewat login user. Balasannya SAMA dengan
+        // password salah (401 generik) supaya endpoint ini tidak membocorkan
+        // email mana yang admin. Admin login lewat /api/admin/auth/login.
+        if (UserTypeCode.ADMIN.equals(user.getUserType())) {
+            throw new InvalidCredentialsException();
+        }
+
         // Cek verified SETELAH password valid -> supaya orang yang asal
         // nebak-nebak email tidak bisa membedakan "email tidak ada" vs
         // "email ada tapi belum verified" dari pesan errornya.
@@ -158,7 +168,8 @@ public class AuthServiceImpl implements AuthService {
             throw new AccountNotVerifiedException();
         }
 
-        String token = jwtService.generateToken(user.getEmail(), user.getPassword());
+        String role = Roles.fromUserType(user.getUserType());
+        String token = jwtService.generateToken(user.getEmail(), user.getPassword(), role);
 
         activityLogService.log(user.getEmail(), "LOGIN");
 
@@ -169,6 +180,7 @@ public class AuthServiceImpl implements AuthService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .name(user.getName())
+                .role(role)
                 .build();
     }
 
@@ -209,7 +221,10 @@ public class AuthServiceImpl implements AuthService {
         // FRONTEND (bukan backend) -- karena user perlu isi FORM password
         // baru, bukan sekadar klik konfirmasi. Validasi token yang
         // sebenarnya terjadi saat user SUBMIT form (POST /reset-password).
-        String resetLink = frontendBaseUrl + "/auth/reset-password?token=" + resetToken;
+        // Akun admin memakai halaman reset di area admin (sukses -> /admin/signin).
+        String resetPath = UserTypeCode.ADMIN.equals(user.getUserType())
+                ? "/admin/reset-password" : "/auth/reset-password";
+        String resetLink = frontendBaseUrl + resetPath + "?token=" + resetToken;
         emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
 
         activityLogService.log(user.getEmail(), "FORGOT_PASSWORD_REQUEST");
@@ -268,12 +283,14 @@ public class AuthServiceImpl implements AuthService {
         // Token lama sudah tidak berlaku (versi password berubah) -> beri
         // token baru untuk sesi ini.
         return LoginResponseDTO.builder()
-                .accessToken(jwtService.generateToken(saved.getEmail(), saved.getPassword()))
+                .accessToken(jwtService.generateToken(
+                        saved.getEmail(), saved.getPassword(), Roles.fromUserType(saved.getUserType())))
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getExpirationSeconds())
                 .id(saved.getId())
                 .email(saved.getEmail())
                 .name(saved.getName())
+                .role(Roles.fromUserType(saved.getUserType()))
                 .build();
     }
 
@@ -349,8 +366,15 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    private String buildRedirectUrl(EmailVerificationResult result) {
-        String loginUrl = frontendBaseUrl + "/auth/signin";
+    private static final String USER_SIGNIN_PATH = "/auth/signin";
+    private static final String ADMIN_SIGNIN_PATH = "/admin/signin";
+
+    private String signinPathFor(User user) {
+        return UserTypeCode.ADMIN.equals(user.getUserType()) ? ADMIN_SIGNIN_PATH : USER_SIGNIN_PATH;
+    }
+
+    private String buildRedirectUrl(EmailVerificationResult result, String signinPath) {
+        String loginUrl = frontendBaseUrl + signinPath;
 
         return switch (result) {
             case SUCCESS, ALREADY_VERIFIED -> loginUrl + "?verified=true";

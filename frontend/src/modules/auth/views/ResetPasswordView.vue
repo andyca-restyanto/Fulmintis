@@ -18,6 +18,10 @@ const router = useRouter();
 
 const token = typeof route.query.token === 'string' ? route.query.token : '';
 
+// Halaman ini dipakai dua area: user (/auth/reset-password) dan admin (/admin/reset-password,
+// route meta.area = 'admin'). Bedanya hanya tujuan redirect setelah sukses.
+const isAdminArea = route.meta.area === 'admin';
+
 // 'checking' -> lagi validasi token ke backend
 // 'valid'    -> token oke, tampilkan form
 // 'invalid'  -> token invalid/expired/tidak ada, tampilkan pesan error
@@ -74,7 +78,7 @@ async function handleSubmit() {
       confirmNewPassword: confirmNewPassword.value,
     });
     // Redirect ke Sign In dengan notifikasi sukses (AuthView baca query "reset")
-    router.push({ name: 'auth-signin', query: { reset: 'true' } });
+    router.push({ name: isAdminArea ? 'admin-signin' : 'auth-signin', query: { reset: 'true' } });
   } catch (err) {
     if (axios.isAxiosError<ApiValidationErrorResponse>(err)) {
       const data = err.response?.data;

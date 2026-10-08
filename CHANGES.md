@@ -1215,3 +1215,82 @@ utk membedakan keluaran terpotong dari format salah. Template prompt `automation
 **Verifikasi:** test baru utk klasifikasi path, kasus `.gitignore` nyata, daftar+hitungan berkas dilewati, batas catatan, semua-dilewati, executable/traversal di samping berkas jinak, sanitasi nama, duplikat, batas jumlah mentah, dan
 job end-to-end (`EXTRA_FILES` -> SUCCEEDED tanpa `.gitignore`/`Dockerfile`, catatan memuat keduanya). 9 bug sengaja pada logika baru -- seluruhnya tertangkap.
 
+
+---
+
+## 27. Fitur Admin: pendaftaran admin pertama, undangan admin, pemisahan akses (Luhut, backend)
+
+**Keputusan produk:** admin pertama bebas mendaftar; admin berikutnya hanya bisa dibuat admin yang sudah login (undangan email). Admin tidak boleh memakai API/dashboard user, dan sebaliknya.
+
+**Tipe user baru `ADMIN`** (master_data): `UserTypeCode.ADMIN` + `UserTypeSeeder` (label "Admin", urutan 4; idempotent, tanpa migrasi SQL). `GET /api/user-types` TIDAK lagi memuat ADMIN.
+
+**Pemisahan akses (`shared/security`, `SecurityConfig`):**
+- `Roles` memetakan `user_type` -> `ROLE_ADMIN` / `ROLE_USER`. `JwtAuthenticationFilter` mengisi authorities dari **user_type di DB pada setiap request** (filter ini memang sudah memuat user); claim `role` di JWT hanya info untuk FE dan TIDAK dipercaya untuk otorisasi. Token lama tanpa claim dianggap USER.
+- `/api/admin/**` -> hanya `ROLE_ADMIN`; `/api/auth/profile` & `/api/auth/change-password` -> semua yang login; **semua endpoint lain -> hanya `ROLE_USER`** (admin dapat 403 di API project/test case/AI/dst). `JwtAccessDeniedHandler` membalas 403 JSON dgn format yang sama dgn 401/handler lain.
+- `RateLimitFilter`: aturan baru utk login admin, daftar admin (default 5/menit, `app.rate-limit.admin-register-per-minute`), terima undangan, undang admin, dan dua GET publik admin.
+
+**Auth user (`modules/auth`):** `/api/auth/login` menolak akun ADMIN dgn 401 generik yang SAMA dgn password salah (tidak membocorkan akun admin). `LoginResponseDTO` mendapat `role` ("USER"|"ADMIN"), juga di respons change-password. Link verifikasi email admin -> `/admin/signin`; link reset password admin -> `/admin/reset-password`. `/api/auth/register` tetap selalu FREE.
+
+**Modul baru `modules/admin`:**
+- `GET /api/admin/auth/registration-status` -> `{open, bootstrapCodeRequired}` (open = belum ada user ADMIN).
+- `POST /api/admin/auth/register` -- hanya saat belum ada admin, selain itu 403 "Pendaftaran admin sudah ditutup". Cek-lalu-simpan diserialkan dgn `pg_advisory_xact_lock` (aman utk request paralel dan banyak instance). Bila `app.admin.bootstrap-code` diisi, `bootstrapCode` wajib benar (perbandingan waktu-konstan); kosong = bebas.
+- `POST /api/admin/auth/login` -- non-admin = 401 generik yang sama dgn password salah.
+- `POST /api/admin/admins` (ROLE_ADMIN) -- undang admin: akun ADMIN belum aktif dgn password acak yang tak diketahui siapa pun + token undangan 24 jam (kolom baru, bukan kolom reset/verifikasi). Email milik user biasa/admin aktif -> 409 (tidak ada "promosi" akun); undangan yang belum diterima dikirim ulang dgn token baru.
+- `GET /api/admin/auth/invitation/validate`, `POST /api/admin/auth/accept-invitation` -- penerima membuat password; akun otomatis terverifikasi; token sekali pakai.
+- `GET /api/admin/me`. `AdminBootstrapWarning`: WARN saat start di profil `prod` bila belum ada admin dan bootstrap-code kosong (tidak pernah menggagalkan startup).
+- `User` mendapat `adminInvitationToken` + `adminInvitationExpiresAt` -> **migrasi `V19__add_admin_invitation_columns_to_users.sql`** (prod/Flyway; lokal diurus ddl-auto=update).
+- `EmailService.sendAdminInvitationEmail(...)`; nama & pengundang di-escape HTML.
+- Pencarian/penambahan team member project mengecualikan akun ADMIN (`findByEmailAndVerifiedTrueAndUserTypeNot`). `AiTier.fromUserType(ADMIN)` = FREE secara eksplisit (admin sudah 403 di API AI; ini lapis kedua).
+
+**Konfigurasi baru -- semua punya default di kode, jadi application*.properties TIDAK wajib diubah:**
+```
+app.admin.bootstrap-code=${ADMIN_BOOTSTRAP_CODE:}            # kosong = admin pertama bebas; isi di production
+app.security.admin-invitation-expiry-minutes=1440            # masa berlaku undangan (menit)
+app.rate-limit.admin-register-per-minute=5
+```
+Rekomendasi: di production isi `ADMIN_BOOTSTRAP_CODE` sampai admin pertama terbentuk, lalu kosongkan.
+
+**Batasan yang perlu diketahui:**
+- Jika admin pertama salah ketik email dan tidak bisa verifikasi, pendaftaran tetap tertutup (akun admin tak terverifikasi tetap dihitung). Pemulihan: hapus barisnya di tabel `users` (operasional/DB).
+- Belum ada daftar/nonaktifkan/hapus admin dan belum ada pergantian peran.
+- Dua undangan bersamaan ke email BARU yang sama bisa menghasilkan satu 500 (unique email); sangat jarang dan aman (tidak ada data ganda).
+- `lockAdvisory` memakai query native PostgreSQL (`select 1 from (select pg_advisory_xact_lock(:key)) as lock_row`) -- belum dijalankan terhadap PostgreSQL sungguhan (lihat Verifikasi).
+
+**Test baru:** `AdminAuthServiceTest`, `AdminManagementServiceTest`, `AdminDtoValidationTest`, `AuthAdminSeparationTest`, `JwtAuthenticationFilterRoleTest`, `RolesAndJwtRoleTest`, `RateLimitFilterAdminTest`, `UserTypeAdminTest`, `AiTierAdminTest`, `EmailServiceAdminInvitationTest` (+ pembantu `AdminTestSupport`).
+
+**Verifikasi:** seluruh 320 berkas Java lolos pemeriksaan sintaks (parser javac) dan semua `import com.example.app...` baru ter-resolve. **`mvn test` TIDAK dapat dijalankan di lingkungan ini (Maven Central tidak terjangkau)**, jadi kode & test baru belum dikompilasi/dijalankan dgn Spring/Lombok/JUnit; jalankan `mvn test` sebelum merge. Aturan matcher `SecurityConfig` belum diuji end-to-end; cek manual di bawah.
+
+**Cek manual (setelah backend jalan):**
+1. `GET /api/admin/auth/registration-status` -> `open:true`. Daftar admin pertama, verifikasi email, login via `/api/admin/auth/login` -> `role:"ADMIN"`.
+2. Daftar lagi -> 403 ditutup; `registration-status` -> `open:false`.
+3. Dengan token admin: `GET /api/projects` -> **403**; `GET /api/admin/me` -> 200. Dengan token user: `GET /api/admin/me` -> **403**.
+4. `POST /api/auth/login` dgn akun admin -> 401 "Email atau password salah".
+5. Admin `POST /api/admin/admins` -> email undangan; buka link, buat password, login admin kedua.
+
+---
+
+## 28. Fitur Admin: halaman admin, pemisahan area user/admin (Pigay, frontend)
+
+Menyesuaikan dengan backend bagian 27. Admin punya area sendiri (`/admin/...`); admin tidak bisa membuka dashboard/halaman user, dan user biasa tidak bisa membuka area admin.
+
+**Halaman baru (`modules/admin`):**
+- `/admin/signup` -- pendaftaran ADMIN PERTAMA. Saat dibuka memanggil `GET /api/admin/auth/registration-status`: `open=false` -> layar "Pendaftaran admin ditutup" (admin berikutnya hanya lewat undangan); field "Kode pendaftaran" hanya muncul bila `bootstrapCodeRequired`. Bila submit dibalas 403, FE menanyakan status ke backend (bukan menebak dari teks pesan): ditutup -> layar ditutup, kode salah -> pesan di form.
+- `/admin/signin` -- login admin (`POST /api/admin/auth/login`). Menampilkan notifikasi `?verified=` / `?reset=` / `?accepted=` / `?expired=`; link "Daftarkan admin pertama" hanya tampil selama pendaftaran terbuka; "Forgot Password?" memakai halaman lupa password yang sudah ada (link di email admin mengarah ke `/admin/reset-password`).
+- `/admin/accept-invitation?token=` -- penerima undangan memvalidasi link lalu membuat password (pola sama dengan reset password); sukses -> `/admin/signin?accepted=true`.
+- `/admin/reset-password` -- memakai ulang `ResetPasswordView` (route `meta.area = 'admin'` -> setelah sukses ke `/admin/signin`).
+- Area admin (`AdminLayoutView` = header + sidebar + `<RouterView/>`; `meta: { requiresAuth: true, role: 'ADMIN' }` diwarisi semua anak): `/admin/dashboard` (kartu "Tambah Admin"), `/admin/admins/new` (form undang admin: nama + email; 409 ditampilkan inline), serta empat menu sidebar **User, Log user, Payment, AI token used** -> `/admin/users`, `/admin/user-logs`, `/admin/payments`, `/admin/ai-token-usage`, semuanya `ComingSoonView` ("Coming soon", judul dari `meta.title`). Tidak ada panggilan API untuk menu itu.
+- Komponen: `AdminAuthShell`, `AdminPasswordField` (input password + show/hide + checklist), `AdminSidebar`. Ikon baru `CreditCardIcon`.
+
+**Pemisahan akses (UX; proteksi sebenarnya di backend):**
+- `router/guards.ts` (fungsi murni, diuji tanpa browser): belum login -> sign in area yang sesuai (`expired=true` bila token habis); peran tidak cocok -> dashboard perannya sendiri (admin ke `/dashboard`/halaman project -> `/admin/dashboard`; user ke `/admin/*` -> `/dashboard`); sudah login di halaman sign in/up -> dashboard perannya (kecuali ada query notifikasi). Route butuh-login tanpa `meta.role` = area USER, jadi route lama tidak perlu diubah.
+- `tokenStorage.getRole()` membaca klaim `role` JWT (token lama tanpa klaim = USER; token rusak = null) -- hanya untuk UX. `LoginResponse.role` ditambahkan (match `LoginResponseDTO.role`).
+- `LoginForm` (user) menolak respons ber-role ADMIN tanpa menyimpan token (lapis kedua; backend sudah 401). `AdminSigninView` menolak respons non-ADMIN.
+- `apiClient`: respons 401 sekarang mengarahkan ke `/admin/signin` bila sesi yang berakhir adalah sesi admin (`/auth/signin` bila bukan); pengecualian anti-loop mencakup halaman publik admin (`shared/services/authPaths.ts`). Login admin (`/admin/auth/login`) ikut dikecualikan karena URL-nya memuat `/auth/login`.
+- **Penyimpangan dari rencana:** interceptor TIDAK mengarahkan otomatis pada respons 403. Backend memakai 403 untuk banyak hal yang sah di dalam halaman (mis. bukan OWNER project, akun belum terverifikasi), jadi redirect otomatis akan merusaknya. Pemisahan peran dijaga oleh route guard.
+
+**Kontrak (`modules/admin/types/admin-auth.types.ts`) match 100% dengan DTO backend:** `AdminRegisterRequest/Response`, `AdminRegistrationStatus`, `AdminInviteRequest/Response`, `AdminInvitationValidation`, `AdminAcceptInvitationRequest`, `AdminProfile`.
+
+**Test baru** (`frontend/tests/`, Node test runner bawaan, tanpa dependensi baru): `npm test` (= `node --experimental-strip-types --test "tests/*.test.ts"`, butuh Node >= 22.6). 30 test: guard (semua kombinasi tanpa token/kedaluwarsa/USER/ADMIN x halaman user/admin/entry/publik/notifikasi), `tokenStorage` (role/legacy/rusak + perilaku lama), `authPaths`, `adminErrors`, dan tabel route (nama tujuan redirect ada, tidak ada nama ganda, route publik vs terproteksi, empat judul menu). `package.json` hanya mendapat satu baris `scripts.test` (package-lock tidak berubah).
+
+**Verifikasi:** 30 test lulus; 9 mutasi sengaja pada guard/tokenStorage/authPaths/adminErrors seluruhnya tertangkap. Script semua `.vue` yang baru/diubah lolos type-check TypeScript strict (dengan shim vue/vue-router/axios) dan template-nya lolos pemeriksa identifier (semua variabel/komponen yang dipakai template terdefinisi, tidak ada impor tak terpakai; pemeriksa sendiri diuji mutasi).
+**BELUM diverifikasi:** `npm run build` (`vue-tsc -b` + Vite) dan tampilan di browser -- registry npm menolak paket yang dibutuhkan di lingkungan ini, jadi dependensi tidak bisa dipasang. Jalankan `npm run build` dan `npm test`, lalu cek manual: (1) `/admin/signup` saat belum ada admin, (2) setelah ada admin -> "ditutup", (3) login admin -> `/admin/dashboard`, buka `/dashboard` -> kembali ke `/admin/dashboard`, (4) login user, buka `/admin/dashboard` -> kembali ke `/dashboard`, (5) klik tiap menu sidebar -> "Coming soon", (6) undang admin -> buka link di email -> buat password -> sign in.

@@ -17,7 +17,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -28,6 +27,8 @@ import java.util.Optional;
  *   <li>versi password di token ({@code pv}) sama dengan password user
  *       sekarang -- jadi token lama otomatis mati setelah ganti/reset password.</li>
  * </ol>
+ * Peran (ROLE_ADMIN / ROLE_USER) diambil dari users.user_type di DB pada setiap request,
+ * bukan dari claim token -- jadi perubahan tipe user langsung berlaku dan claim tidak bisa dipalsukan.
  * Kalau salah satu gagal, request diteruskan TANPA autentikasi sehingga
  * endpoint terlindungi membalas 401 (JwtAuthenticationEntryPoint). Sebelumnya
  * user yang sudah terhapus lolos filter lalu jadi 500 di service.
@@ -57,11 +58,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             String token = header.substring(TOKEN_PREFIX.length());
-            Optional<String> authenticatedEmail = resolveAuthenticatedEmail(token);
+            Optional<User> authenticatedUser = resolveAuthenticatedUser(token);
 
-            if (authenticatedEmail.isPresent()) {
+            if (authenticatedUser.isPresent()) {
+                User user = authenticatedUser.get();
                 var authentication = new UsernamePasswordAuthenticationToken(
-                        authenticatedEmail.get(), null, Collections.emptyList()
+                        user.getEmail(), null, Roles.authoritiesFor(user.getUserType())
                 );
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
@@ -70,7 +72,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private Optional<String> resolveAuthenticatedEmail(String token) {
+    private Optional<User> resolveAuthenticatedUser(String token) {
         Optional<JwtService.ParsedToken> parsed = jwtService.parse(token);
         if (parsed.isEmpty() || parsed.get().passwordVersion() == null) {
             // Token tanpa claim "pv" = token lama (sebelum fitur ini) -> login ulang.
@@ -89,6 +91,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return Optional.empty();
         }
 
-        return Optional.of(user.getEmail());
+        return Optional.of(user);
     }
 }

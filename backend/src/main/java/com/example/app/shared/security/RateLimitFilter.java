@@ -72,6 +72,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${app.rate-limit.testcase-ai-per-minute:6}")
     private int testCaseAiPerMinute;
 
+    // Pendaftaran admin pertama: sengaja lebih ketat dari register user
+    @Value("${app.rate-limit.admin-register-per-minute:5}")
+    private int adminRegisterPerMinute;
+
     @Value("${app.rate-limit.trust-forward-headers:false}")
     private boolean trustForwardHeaders;
 
@@ -106,6 +110,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 case "/api/auth/forgot-password" -> { rule = "forgot"; limit = emailPerMinute; }
                 case "/api/auth/resend-verification" -> { rule = "resend"; limit = emailPerMinute; }
                 case "/api/auth/reset-password" -> { rule = "reset"; limit = emailPerMinute * 2; }
+                case "/api/admin/auth/login" -> { rule = "admin-login"; limit = loginPerMinute; }
+                case "/api/admin/auth/register" -> { rule = "admin-register"; limit = adminRegisterPerMinute; }
+                case "/api/admin/auth/accept-invitation" -> { rule = "admin-accept"; limit = emailPerMinute * 2; }
+                case "/api/admin/admins" -> { rule = "admin-invite"; limit = emailPerMinute; } // memicu email
                 default -> {
                     if (TEST_CASE_IMPORT.matcher(path).matches()) {
                         rule = "import";
@@ -121,6 +129,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
         } else if ("GET".equals(method) && COLLABORATOR_SEARCH.matcher(path).matches()) {
             rule = "search";
+            limit = searchPerMinute;
+        } else if ("GET".equals(method)
+                && ("/api/admin/auth/registration-status".equals(path)
+                    || "/api/admin/auth/invitation/validate".equals(path))) {
+            rule = "admin-public";
             limit = searchPerMinute;
         }
 

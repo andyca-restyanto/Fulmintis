@@ -21,6 +21,7 @@ import java.util.Optional;
 public class JwtService {
 
     private static final String PASSWORD_VERSION_CLAIM = "pv";
+    private static final String ROLE_CLAIM = "role";
 
     @Value("${app.security.jwt-secret}")
     private String jwtSecret;
@@ -40,12 +41,22 @@ public class JwtService {
      * blacklist/kolom baru.
      */
     public String generateToken(String email, String passwordHash) {
+        return generateToken(email, passwordHash, Roles.USER);
+    }
+
+    /**
+     * Sama seperti di atas, ditambah claim {@code role} ("USER" | "ADMIN"). Claim ini
+     * HANYA informasi untuk frontend; otorisasi di backend memakai user_type dari DB
+     * (lihat JwtAuthenticationFilter), jadi memalsukan/menunggu claim ini tidak memberi akses.
+     */
+    public String generateToken(String email, String passwordHash, String role) {
         Instant now = Instant.now();
         Instant expiry = now.plusSeconds(jwtExpirationMinutes * 60);
 
         return Jwts.builder()
                 .subject(email)
                 .claim(PASSWORD_VERSION_CLAIM, passwordFingerprint(passwordHash))
+                .claim(ROLE_CLAIM, role)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(signingKey())
@@ -57,7 +68,7 @@ public class JwtService {
     }
 
     /** Isi token yang sudah lolos verifikasi tanda tangan & kedaluwarsa. */
-    public record ParsedToken(String email, String passwordVersion) {
+    public record ParsedToken(String email, String passwordVersion, String role) {
     }
 
     /** @return isi token kalau tanda tangan valid & belum expired, kosong kalau tidak. */
@@ -72,7 +83,12 @@ public class JwtService {
             if (email == null || email.isBlank()) {
                 return Optional.empty();
             }
-            return Optional.of(new ParsedToken(email, claims.get(PASSWORD_VERSION_CLAIM, String.class)));
+            return Optional.of(new ParsedToken(
+                    email,
+                    claims.get(PASSWORD_VERSION_CLAIM, String.class),
+                    // token lama (sebelum fitur admin) tidak punya claim ini -> USER
+                    Optional.ofNullable(claims.get(ROLE_CLAIM, String.class)).orElse(Roles.USER)
+            ));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

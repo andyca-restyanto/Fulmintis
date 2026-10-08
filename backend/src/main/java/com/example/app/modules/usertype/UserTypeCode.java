@@ -9,4 +9,11 @@ public final class UserTypeCode {
     public static final String FREE = "FREE";
     public static final String VIP_MONTHLY = "VIP_MONTHLY";
     public static final String VIP_YEARLY = "VIP_YEARLY";
+
+    /**
+     * Akun administrator. BUKAN tier berlangganan: tidak boleh muncul di dropdown
+     * upgrade akun (lihat UserTypeController) dan tidak boleh dibuat lewat
+     * /api/auth/register (selalu FREE).
+     */
+    public static final String ADMIN = "ADMIN";
 }

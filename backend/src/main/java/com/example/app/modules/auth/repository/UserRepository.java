@@ -3,6 +3,8 @@ package com.example.app.modules.auth.repository;
 
 import com.example.app.modules.auth.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +18,23 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // user yang sudah verified dan HANYA cocok persis dengan email -- tidak
     // ada lagi pencarian substring/nama yang bisa dipakai memanen daftar user.
     Optional<User> findByEmailAndVerifiedTrue(String email);
+
+    /**
+     * Sama seperti {@link #findByEmailAndVerifiedTrue} tapi mengecualikan satu tipe user.
+     * Dipakai pencarian/penambahan team member agar akun ADMIN tidak bisa ditemukan
+     * maupun dimasukkan ke project user.
+     */
+    Optional<User> findByEmailAndVerifiedTrueAndUserTypeNot(String email, String userType);
+
+    long countByUserType(String userType);
+
+    Optional<User> findByAdminInvitationToken(String adminInvitationToken);
+
+    /**
+     * Kunci advisory PostgreSQL level-transaksi: melepas otomatis saat commit/rollback.
+     * Menyerialkan pendaftaran admin pertama (cek-lalu-simpan) antar request/instance.
+     * Harus dipanggil di dalam transaksi. Mengembalikan 1 (nilai tidak dipakai).
+     */
+    @Query(value = "select 1 from (select pg_advisory_xact_lock(:key)) as lock_row", nativeQuery = true)
+    Integer lockAdvisory(@Param("key") long key);
 }

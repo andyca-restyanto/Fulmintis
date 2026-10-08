@@ -7,12 +7,19 @@ import com.example.app.modules.usertype.UserTypeCode;
  * Tier konfigurasi AI. Mengikuti tipe user (users.user_type): FREE -> FREE;
  * VIP_MONTHLY dan VIP_YEARLY -> VIP (konfigurasi sama). Tipe yang tidak
  * dikenal diperlakukan sebagai FREE (arah paling aman terhadap biaya).
+ *
+ * ADMIN juga jatuh ke FREE secara EKSPLISIT: admin bukan pengguna fitur AI dan
+ * sudah ditolak 403 oleh SecurityConfig (/api/** non-admin hanya ROLE_USER); ini
+ * hanya lapis kedua agar admin tidak pernah mendapat kuota VIP.
  */
 public enum AiTier {
     FREE,
     VIP;
 
     public static AiTier fromUserType(String userType) {
+        if (UserTypeCode.ADMIN.equals(userType)) {
+            return FREE;
+        }
         if (UserTypeCode.VIP_MONTHLY.equals(userType) || UserTypeCode.VIP_YEARLY.equals(userType)) {
             return VIP;
         }

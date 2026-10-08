@@ -12,4 +12,5 @@ export interface LoginResponse {
   id: string;
   email: string;
   name: string | null; // nullable -- match LoginResponseDTO.name (requirement #4)
+  role: 'USER' | 'ADMIN'; // match LoginResponseDTO.role -- dipakai memilih dashboard
 }

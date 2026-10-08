@@ -4,6 +4,9 @@ package com.example.app.shared.exception;
 import com.example.app.modules.project.exception.CollaborationNotFoundException;
 import com.example.app.modules.project.exception.LastOwnerException;
 import com.example.app.modules.testrun.exception.TestResultConflictException;
+import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
+import com.example.app.modules.admin.exception.InvalidAdminBootstrapCodeException;
+import com.example.app.modules.admin.exception.InvalidAdminInvitationException;
 import com.example.app.modules.auth.exception.AccountNotVerifiedException;
 import com.example.app.modules.auth.exception.EmailAlreadyExistsException;
 import com.example.app.modules.auth.exception.IncorrectCurrentPasswordException;
@@ -55,6 +58,21 @@ public class GlobalExceptionHandler {
         body.put("errors", errors);
 
         return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(AdminRegistrationClosedException.class)
+    public ResponseEntity<Map<String, Object>> handleAdminRegistrationClosed(AdminRegistrationClosedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidAdminBootstrapCodeException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidAdminBootstrapCode(InvalidAdminBootstrapCodeException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidAdminInvitationException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidAdminInvitation(InvalidAdminInvitationException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(EmailAlreadyExistsException.class)

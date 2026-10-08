@@ -5,6 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStorage } from './tokenStorage';
+import { isPublicAuthPath, signinPathForRole } from './authPaths';
 
 // Ambil dari .env, contoh: VITE_API_BASE_URL=http://localhost:8080/api
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -41,11 +42,12 @@ apiClient.interceptors.response.use(
       // Token invalid/expired/dicabut (mis. password diganti) -> bersihkan
       // sesi & arahkan ke SIGN IN (bukan /auth yang halaman sign-up).
       const hadSession = Boolean(tokenStorage.getToken());
+      const signinPath = signinPathForRole(tokenStorage.getRole()); // baca SEBELUM token dibuang
       tokenStorage.clearToken();
 
-      // Hindari redirect loop kalau memang lagi di halaman auth
-      if (!window.location.pathname.startsWith('/auth')) {
-        window.location.href = hadSession ? '/auth/signin?expired=true' : '/auth/signin';
+      // Hindari redirect loop kalau memang lagi di halaman auth (user maupun admin)
+      if (!isPublicAuthPath(window.location.pathname)) {
+        window.location.href = hadSession ? `${signinPath}?expired=true` : signinPath;
       }
     }
 

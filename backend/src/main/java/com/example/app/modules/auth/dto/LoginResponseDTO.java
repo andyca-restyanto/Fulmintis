@@ -17,4 +17,5 @@ public class LoginResponseDTO {
     private UUID id;
     private String email;
     private String name; // nullable -- lihat User.name (requirement #4)
+    private String role; // "USER" | "ADMIN" -- dipakai FE untuk memilih dashboard
 }

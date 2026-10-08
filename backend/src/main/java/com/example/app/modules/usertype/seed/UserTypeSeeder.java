@@ -26,6 +26,7 @@ public class UserTypeSeeder implements CommandLineRunner {
         seed(UserTypeCode.FREE, "Free", 1);
         seed(UserTypeCode.VIP_MONTHLY, "VIP Monthly", 2);
         seed(UserTypeCode.VIP_YEARLY, "VIP Yearly", 3);
+        seed(UserTypeCode.ADMIN, "Admin", 4);
     }
 
     private void seed(String code, String label, int sortOrder) {
