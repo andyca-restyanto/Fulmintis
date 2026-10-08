@@ -14,8 +14,10 @@ withDefaults(
     /** Tampilkan daftar aturan password (untuk field "password baru", bukan konfirmasi). */
     showChecklist?: boolean;
     placeholder?: string;
+    /** Petunjuk untuk password manager: 'current-password' untuk password saat ini. */
+    autocomplete?: 'new-password' | 'current-password';
   }>(),
-  { error: '', showChecklist: false, placeholder: '••••••••' }
+  { error: '', showChecklist: false, placeholder: '••••••••', autocomplete: 'new-password' }
 );
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
@@ -36,7 +38,7 @@ function onInput(event: Event) {
         :value="modelValue"
         :type="visible ? 'text' : 'password'"
         :placeholder="placeholder"
-        autocomplete="new-password"
+        :autocomplete="autocomplete"
         class="w-full rounded-xl border border-gray-200 px-4 py-3.5 pr-12 text-base placeholder-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-100"
         :class="{ 'border-red-500': error }"
         @input="onInput"

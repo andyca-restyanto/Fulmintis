@@ -100,7 +100,7 @@ async function handleSubmit() {
 }
 
 function goToForgotPassword() {
-  router.push({ name: 'auth-forgot-password' });
+  router.push({ name: isAdminArea ? 'admin-forgot-password' : 'auth-forgot-password' });
 }
 </script>
 

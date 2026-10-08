@@ -3,7 +3,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { adminAuthService } from '../services/adminAuth.service';
-import { readAdminError } from '../utils/adminErrors';
+import { readAdminError, isAccountDeactivated, offersVerificationResend } from '../utils/adminErrors';
 import AdminAuthShell from '../components/AdminAuthShell.vue';
 import AdminPasswordField from '../components/AdminPasswordField.vue';
 import VerificationNotice from '@/modules/auth/components/VerificationNotice.vue';
@@ -88,7 +88,10 @@ async function handleSubmit() {
     const info = readAdminError(err, 'Email atau password salah');
     if (info.status === 400 && Object.keys(info.fieldErrors).length > 0) {
       serverErrors.value = info.fieldErrors;
-    } else if (info.status === 403) {
+    } else if (isAccountDeactivated(info)) {
+      // Akun dinonaktifkan admin lain: kirim ulang verifikasi tidak relevan, jadi form-nya tidak ditampilkan.
+      generalError.value = info.message || 'Akun admin ini dinonaktifkan. Hubungi admin lain untuk mengaktifkannya kembali.';
+    } else if (offersVerificationResend(info)) {
       generalError.value = info.message || 'Akun belum diverifikasi. Silakan cek email kamu.';
       showResend.value = true;
     } else {
@@ -152,7 +155,7 @@ async function handleSubmit() {
         <button
           type="button"
           class="text-sm text-gray-400 hover:text-gray-600"
-          @click="router.push({ name: 'auth-forgot-password' })"
+          @click="router.push({ name: 'admin-forgot-password' })"
         >
           Forgot Password?
         </button>

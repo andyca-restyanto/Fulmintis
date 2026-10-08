@@ -4,9 +4,13 @@ package com.example.app.shared.exception;
 import com.example.app.modules.project.exception.CollaborationNotFoundException;
 import com.example.app.modules.project.exception.LastOwnerException;
 import com.example.app.modules.testrun.exception.TestResultConflictException;
+import com.example.app.modules.admin.exception.AccountDeactivatedException;
+import com.example.app.modules.admin.exception.AdminNotFoundException;
 import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
+import com.example.app.modules.admin.exception.CannotDeactivateSelfException;
 import com.example.app.modules.admin.exception.InvalidAdminBootstrapCodeException;
 import com.example.app.modules.admin.exception.InvalidAdminInvitationException;
+import com.example.app.modules.admin.exception.LastActiveAdminException;
 import com.example.app.modules.auth.exception.AccountNotVerifiedException;
 import com.example.app.modules.auth.exception.EmailAlreadyExistsException;
 import com.example.app.modules.auth.exception.IncorrectCurrentPasswordException;
@@ -73,6 +77,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidAdminInvitationException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidAdminInvitation(InvalidAdminInvitationException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(CannotDeactivateSelfException.class)
+    public ResponseEntity<Map<String, Object>> handleCannotDeactivateSelf(CannotDeactivateSelfException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(LastActiveAdminException.class)
+    public ResponseEntity<Map<String, Object>> handleLastActiveAdmin(LastActiveAdminException ex) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(AdminNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleAdminNotFound(AdminNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(AccountDeactivatedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountDeactivated(AccountDeactivatedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), AccountDeactivatedException.CODE);
     }
 
     @ExceptionHandler(EmailAlreadyExistsException.class)
@@ -240,9 +264,17 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
+        return buildResponse(status, message, null);
+    }
+
+    /** {@code code} opsional: pembeda mesin untuk kasus yang status HTTP-nya sama (mis. beberapa 403). */
+    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message, String code) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", status.value());
+        if (code != null) {
+            body.put("code", code);
+        }
         body.put("message", message);
 
         return ResponseEntity.status(status).body(body);

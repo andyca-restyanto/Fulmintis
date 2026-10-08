@@ -2,6 +2,8 @@
 package com.example.app.modules.auth.repository;
 
 import com.example.app.modules.auth.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,6 +31,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     long countByUserType(String userType);
 
     Optional<User> findByAdminInvitationToken(String adminInvitationToken);
+
+    /** Daftar akun satu tipe (dipakai menu Admin); urutan & ukuran halaman ditentukan Pageable. */
+    Page<User> findAllByUserType(String userType, Pageable pageable);
+
+    /** Jumlah akun satu tipe yang aktif dan sudah terverifikasi (batas aman "admin aktif terakhir"). */
+    long countByUserTypeAndActiveTrueAndVerifiedTrue(String userType);
 
     /**
      * Kunci advisory PostgreSQL level-transaksi: melepas otomatis saat commit/rollback.

@@ -1,0 +1,23 @@
+// filepath: /backend/src/main/java/com/example/app/modules/admin/dto/AdminListResponseDTO.java
+package com.example.app.modules.admin.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.util.List;
+
+/**
+ * Satu halaman daftar admin. {@code page} (mulai 0) dan {@code size} adalah nilai yang benar-benar
+ * dipakai setelah dipaksa masuk batas. Match: AdminListPage (FE).
+ */
+@Getter
+@Builder
+@AllArgsConstructor
+public class AdminListResponseDTO {
+    private List<AdminListItemResponseDTO> items;
+    private int page;
+    private int size;
+    private long totalItems;
+    private int totalPages;
+}

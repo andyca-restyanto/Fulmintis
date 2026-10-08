@@ -5,6 +5,7 @@ import com.example.app.modules.admin.dto.AdminAcceptInvitationRequestDTO;
 import com.example.app.modules.admin.dto.AdminRegisterRequestDTO;
 import com.example.app.modules.admin.dto.AdminRegisterResponseDTO;
 import com.example.app.modules.admin.dto.AdminRegistrationStatusResponseDTO;
+import com.example.app.modules.admin.exception.AccountDeactivatedException;
 import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
 import com.example.app.modules.admin.exception.InvalidAdminBootstrapCodeException;
 import com.example.app.modules.admin.exception.InvalidAdminInvitationException;
@@ -225,6 +226,45 @@ class AdminAuthServiceTest {
                 () -> service.login(loginRequest("admin@example.com", PASSWORD)));
     }
 
+    @Test
+    void deactivatedAdminWithCorrectPasswordGetsTheDedicatedErrorNotTheVerificationOne() {
+        User admin = AdminTestSupport.user("admin@example.com", UserTypeCode.ADMIN, true, PASSWORD);
+        admin.setActive(false);
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+
+        assertThrows(AccountDeactivatedException.class,
+                () -> service.login(loginRequest("admin@example.com", PASSWORD)));
+
+        // Admin nonaktif yang juga belum terverifikasi: tetap "nonaktif" (FE tidak boleh menawarkan verifikasi).
+        admin.setVerified(false);
+        assertThrows(AccountDeactivatedException.class,
+                () -> service.login(loginRequest("admin@example.com", PASSWORD)));
+        verify(activityLogService, never()).log(anyString(), eq("ADMIN_LOGIN"));
+    }
+
+    @Test
+    void deactivatedAdminWithWrongPasswordLearnsNothing() {
+        User admin = AdminTestSupport.user("admin@example.com", UserTypeCode.ADMIN, true, PASSWORD);
+        admin.setActive(false);
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+
+        assertThrows(InvalidCredentialsException.class,
+                () -> service.login(loginRequest("admin@example.com", "Salah!Pass1")));
+    }
+
+    @Test
+    void reactivatedAdminCanLoginAgain() {
+        User admin = AdminTestSupport.user("admin@example.com", UserTypeCode.ADMIN, true, PASSWORD);
+        admin.setActive(false);
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+        assertThrows(AccountDeactivatedException.class,
+                () -> service.login(loginRequest("admin@example.com", PASSWORD)));
+
+        admin.setActive(true);
+
+        assertEquals("ADMIN", service.login(loginRequest("admin@example.com", PASSWORD)).getRole());
+    }
+
     // ---------------- undangan ----------------
 
     private User pendingInvitee(String token, LocalDateTime expiresAt) {
@@ -308,6 +348,21 @@ class AdminAuthServiceTest {
         service.acceptInvitation(acceptRequest("tok-1"));
 
         assertEquals("ADMIN", service.login(loginRequest("sari@example.com", PASSWORD)).getRole());
+    }
+
+    @Test
+    void deactivatedInviteeCannotValidateOrAcceptTheInvitationUntilReactivated() {
+        User invitee = pendingInvitee("tok-1", LocalDateTime.now().plusHours(1));
+        invitee.setActive(false);
+        when(userRepository.findByAdminInvitationToken("tok-1")).thenReturn(Optional.of(invitee));
+
+        assertThrows(InvalidAdminInvitationException.class, () -> service.validateInvitation("tok-1"));
+        assertThrows(InvalidAdminInvitationException.class, () -> service.acceptInvitation(acceptRequest("tok-1")));
+        assertFalse(invitee.isVerified());
+        assertEquals("tok-1", invitee.getAdminInvitationToken());
+
+        invitee.setActive(true); // diaktifkan kembali: undangan yang sama berlaku lagi
+        assertTrue(service.validateInvitation("tok-1").isValid());
     }
 
     private static long anyLong() {

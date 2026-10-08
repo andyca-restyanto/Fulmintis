@@ -8,6 +8,7 @@ const PUBLIC_AUTH_PREFIXES = [
   '/admin/signin',
   '/admin/signup',
   '/admin/accept-invitation',
+  '/admin/forgot-password',
   '/admin/reset-password',
 ];
 

@@ -6,7 +6,7 @@ import { isPublicAuthPath, signinPathForRole } from '../src/shared/services/auth
 test('halaman publik user dan admin dikenali (tidak memicu redirect 401 berulang)', () => {
   for (const path of [
     '/auth', '/auth/signin', '/auth/reset-password',
-    '/admin/signin', '/admin/signup', '/admin/accept-invitation', '/admin/reset-password',
+    '/admin/signin', '/admin/signup', '/admin/accept-invitation', '/admin/forgot-password', '/admin/reset-password',
   ]) {
     assert.equal(isPublicAuthPath(path), true, path);
   }
@@ -15,8 +15,8 @@ test('halaman publik user dan admin dikenali (tidak memicu redirect 401 berulang
 test('area terproteksi dan path mirip BUKAN halaman publik', () => {
   for (const path of [
     '/', '/dashboard', '/projects/1/dashboard',
-    '/admin', '/admin/dashboard', '/admin/admins/new', '/admin/users',
-    '/authors', '/admin/signing', '/admin/signin-extra',
+    '/admin', '/admin/dashboard', '/admin/admins/new', '/admin/users', '/admin/change-password',
+    '/authors', '/admin/signing', '/admin/signin-extra', '/admin/forgot-password-x',
   ]) {
     assert.equal(isPublicAuthPath(path), false, path);
   }

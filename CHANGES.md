@@ -1294,3 +1294,138 @@ Menyesuaikan dengan backend bagian 27. Admin punya area sendiri (`/admin/...`); 
 
 **Verifikasi:** 30 test lulus; 9 mutasi sengaja pada guard/tokenStorage/authPaths/adminErrors seluruhnya tertangkap. Script semua `.vue` yang baru/diubah lolos type-check TypeScript strict (dengan shim vue/vue-router/axios) dan template-nya lolos pemeriksa identifier (semua variabel/komponen yang dipakai template terdefinisi, tidak ada impor tak terpakai; pemeriksa sendiri diuji mutasi).
 **BELUM diverifikasi:** `npm run build` (`vue-tsc -b` + Vite) dan tampilan di browser -- registry npm menolak paket yang dibutuhkan di lingkungan ini, jadi dependensi tidak bisa dipasang. Jalankan `npm run build` dan `npm test`, lalu cek manual: (1) `/admin/signup` saat belum ada admin, (2) setelah ada admin -> "ditutup", (3) login admin -> `/admin/dashboard`, buka `/dashboard` -> kembali ke `/admin/dashboard`, (4) login user, buka `/admin/dashboard` -> kembali ke `/dashboard`, (5) klik tiap menu sidebar -> "Coming soon", (6) undang admin -> buka link di email -> buat password -> sign in.
+
+---
+
+## 29. Fitur Admin: ubah password & lupa/reset password admin (Luhut, backend)
+
+**Tidak ada endpoint, DTO, migrasi, atau konfigurasi baru.** Sesuai keputusan "flow sama dengan user", admin memakai endpoint `auth` yang sudah ada; yang berubah hanya dua pengaman kecil dan test yang mengunci perilakunya.
+
+**Yang sudah berlaku sejak bagian 27 (sekarang dikunci test):**
+- `POST /api/auth/change-password` hanya mensyaratkan login (semua peran), jadi admin bisa memakainya. Token baru yang dibalas tetap membawa klaim `role=ADMIN`, dan token lama otomatis tidak berlaku (klaim `pv`). Password saat ini salah -> 400 `IncorrectCurrentPasswordException` (bukan 401, jadi FE tidak ikut logout).
+- `POST /api/auth/forgot-password` untuk akun admin mengirim link `{frontend}/admin/reset-password?token=...`; `POST /api/auth/reset-password` generik, token sekali pakai, sesi lama dicabut.
+
+**Perubahan:**
+- `RateLimitFilter`: aturan baru `change-password` (POST `/api/auth/change-password`, per IP, memakai `app.rate-limit.email-per-minute`, default 5/menit). Berlaku untuk user biasa dan admin; mencegah penebakan "password saat ini" dengan token curian. Tidak ada properti baru.
+- `AuthServiceImpl.forgotPassword`: akun **ADMIN yang belum terverifikasi** (undangan belum diterima) diabaikan diam-diam -- tidak ada token reset, tidak ada email, respons ke klien tetap generik (tidak membuka enumerasi email). Alasannya: reset tidak memverifikasi akun dan tidak menyentuh token undangan, jadi akan meninggalkan akun admin tak-terverifikasi dengan token undangan yang masih hidup. User biasa tidak terpengaruh.
+
+**Batasan yang perlu diketahui:**
+- Admin pertama yang sudah mendaftar tetapi belum klik link verifikasi juga tidak bisa lewat forgot-password; jalurnya `POST /api/auth/resend-verification` (link verifikasi admin tetap ke `/admin/signin`).
+- `change-password` ikut dibatasi 5 percobaan/menit/IP (termasuk percobaan dengan input tidak valid). Jika di belakang proxy, pastikan `app.rate-limit.trust-forward-headers` benar agar IP klien yang dihitung.
+
+**Test baru/diperluas:**
+- `AdminPasswordFlowTest` (baru, 8 test): ubah password mempertahankan `role=ADMIN` di token & body dan mengganti versi password; password saat ini salah tidak mengubah apa pun; login admin hanya dengan password baru; forgot-password admin terverifikasi -> link `/admin/reset-password`; admin belum terverifikasi -> tanpa token/email dan token undangan tidak tersentuh; user biasa belum terverifikasi tetap dikirimi link; reset sekali pakai + login password baru; token kedaluwarsa ditolak.
+- `RateLimitFilterAdminTest`: batas `change-password` (percobaan ke-6 -> 429, aturan lain tidak ikut terkunci; GET tidak dibatasi).
+- `JwtAuthenticationFilterRoleTest`: token admin lama ditolak setelah password berubah, token baru diterima.
+
+**Verifikasi:** seluruh berkas Java lolos pemeriksaan sintaks (parser javac) dan semua `import com.example.app...` di berkas baru/diubah ter-resolve. **`mvn test` TIDAK dapat dijalankan di lingkungan ini (Maven Central tidak terjangkau)**; jalankan `mvn test` sebelum merge.
+
+**Cek manual (setelah backend jalan):**
+1. Login admin, `POST /api/auth/change-password` dgn password saat ini benar -> 200 + `accessToken` baru; token lama -> 401; `GET /api/admin/me` dgn token baru -> 200.
+2. Password saat ini salah -> 400 "Password saat ini salah."; panggil 6x dalam semenit -> 429.
+3. `POST /api/auth/forgot-password` dgn email admin terverifikasi -> email berisi link `/admin/reset-password?token=...`; selesaikan reset, login `/api/admin/auth/login` dgn password baru.
+4. Undang admin baru (belum diterima), lalu `forgot-password` dgn emailnya -> respons sama (200 generik) tetapi tidak ada email reset.
+
+---
+
+## 30. Fitur Admin: ubah password & lupa/reset password admin (Pigay, frontend)
+
+Menyesuaikan dengan backend bagian 29. Alurnya sama dengan user dan memakai endpoint `auth` yang sama (`POST /api/auth/change-password`, `forgot-password`, `reset-password`) -- tidak ada tipe atau DTO baru; `ChangePasswordRequest/Response` dan `ForgotPasswordRequest` yang sudah ada tetap match 100% dengan DTO backend.
+
+**Dropdown ikon user di header admin (`AdminLayoutView`):** sekarang berisi **Ubah Password** (ikon `ShieldIcon`) dan **Logout**, dipisah garis tipis. Menu menutup saat klik di luar atau menekan Esc (listener `document` dipasang di `onMounted`, dilepas di `onBeforeUnmount`) dan setelah salah satu item dipilih. Atribut aksesibilitas: `aria-haspopup`, `aria-expanded`, `role="menu"` / `role="menuitem"`.
+
+**Halaman ubah password -- `/admin/change-password`** (`AdminChangePasswordView`, anak `/admin`, jadi mewarisi `requiresAuth` + `role: 'ADMIN'`):
+- Field: password saat ini, password baru (dengan checklist aturan yang sama dengan backend), konfirmasi. Tombol aktif bila semua terisi, aturan lolos, dan konfirmasi sama.
+- Sukses -> token tersimpan diganti `accessToken` baru dari respons (token lama dicabut backend), sehingga sesi tidak putus dan peran tetap ADMIN. Field dikosongkan dan pesan sukses ditampilkan.
+- Error: 400 validasi -> per field; 400 "Password saat ini salah." -> di bawah field password saat ini (400, bukan 401, jadi tidak memicu logout otomatis); 429 (rate limit baru backend), 403, dan gangguan jaringan -> pesan umum di atas tombol.
+- Tautan "Kirim link reset ke email saya" (muncul setelah `GET /api/admin/me` mengembalikan email): memanggil `forgot-password` untuk email admin sendiri dan menampilkan pesan generik dari server. Setelah reset diselesaikan lewat email, sesi lama dicabut dan interceptor mengarahkan ke `/admin/signin?expired=true` (sama dengan user).
+- `AdminPasswordField` mendapat prop opsional `autocomplete` (`'new-password'` default; `'current-password'` untuk password saat ini) agar password manager tidak salah mengisi.
+
+**Lupa password admin -- `/admin/forgot-password`** (publik, `name: 'admin-forgot-password'`, `meta.area = 'admin'`): memakai ulang `ForgotPasswordView` seperti `ResetPasswordView` memakai ulang untuk reset. Bedanya hanya tombol "Back to Sign In" -> `/admin/signin`.
+- `AdminSigninView`: "Forgot Password?" sekarang ke halaman admin ini (sebelumnya ke halaman user, sehingga tombol kembalinya salah arah).
+- `ResetPasswordView`: bila token tidak valid/kedaluwarsa, tombol minta link baru kini ke `/admin/forgot-password` untuk area admin.
+- `shared/services/authPaths.ts`: `/admin/forgot-password` ditambahkan ke daftar halaman publik (anti redirect-loop untuk respons 401).
+
+**Test** (`frontend/tests/`, `npm test`): 36 test (sebelumnya 30). Baru/diperluas: nama & path & `meta.area` route lupa password admin (dan halaman user tidak ikut ber-area admin); `admin-change-password` ada di bawah `/admin` berjudul "Ubah Password"; guard `admin-change-password` (ADMIN lolos; user -> `/dashboard`; tamu/kedaluwarsa -> `/admin/signin`); `/admin/forgot-password` publik dan `/admin/change-password` bukan publik di `authPaths`; token baru setelah ubah password tetap `ADMIN`; serta pemeriksa statis bahwa setiap tujuan `router.push({ name })` di view admin dan lupa/reset password adalah nama route yang ada, dan link "Forgot Password?" admin tidak menunjuk ke halaman user.
+
+**Verifikasi:** 36 test lulus; 8 mutasi sengaja (link signin, authPaths, nama/path/judul route, `meta.area`, nama tujuan di reset & layout) tertangkap semuanya. Script semua `.vue` di `modules/admin` dan `modules/auth` lolos type-check TypeScript strict dengan shim (tersisa 4 error lama di `ResendVerificationForm` dan `apiClient` yang tidak diubah, artefak shim). Pemeriksa template atas 61 berkas `.vue` bersih (variabel/komponen terdefinisi, tidak ada impor tak terpakai) dan terbukti mendeteksi 3 mutasi.
+**BELUM diverifikasi:** `npm run build` (`vue-tsc -b` + Vite) dan tampilan di browser (registry npm tidak terjangkau di lingkungan ini). Jalankan `npm run build` dan `npm test`, lalu cek manual: (1) login admin -> klik ikon user: ada Ubah Password dan Logout; klik di luar/Esc menutup, (2) Ubah Password: password saat ini salah -> pesan di bawah field; benar -> pesan sukses dan halaman admin lain tetap bisa dibuka tanpa login ulang, (3) coba 6x dalam semenit -> pesan "Terlalu banyak percobaan", (4) `/admin/signin` -> "Forgot Password?" -> `/admin/forgot-password` -> email -> link `/admin/reset-password` -> sign in dengan password baru, (5) buka `/admin/change-password` sebagai user biasa -> kembali ke `/dashboard`.
+
+---
+
+## 31. Fitur Admin: menu Admin -- daftar berpaginasi, nonaktifkan, aktifkan kembali (Luhut, backend)
+
+**Keputusan produk:** admin bisa melihat daftar admin (berpaginasi), mengundang admin (endpoint undangan yang sudah ada, termasuk kirim ulang), menonaktifkan, dan mengaktifkan kembali admin.
+
+**Migrasi `V20__add_is_active_to_users.sql`** (prod/Flyway; `ddl-auto=validate` di prod, jadi V20 WAJIB jalan): `users.is_active BOOLEAN NOT NULL DEFAULT TRUE` -- semua akun yang ada tetap aktif. Di lokal (`ddl-auto=update`) kolom dibuat Hibernate; `columnDefinition = "boolean not null default true"` pada `User.active` membuat penambahan kolom NOT NULL ke tabel berisi tidak gagal.
+
+**Endpoint baru (`/api/admin/**`, hanya ROLE_ADMIN; tanpa perubahan `SecurityConfig`):**
+- `GET /api/admin/admins?page=0&size=10` -> `{items, page, size, totalItems, totalPages}`. **Terbaru dulu** (`createdAt` menurun, lalu `id`). `page` mulai 0; `page < 0` -> 0, `size < 1` -> 10, `size > 50` -> 50 (dipaksa masuk batas, bukan error; respons memuat nilai yang benar-benar dipakai). Halaman di luar jangkauan -> `items` kosong dengan total yang tetap benar. Tiap item: `id, name, email, status, self, createdAt, invitationExpiresAt`.
+- `POST /api/admin/admins/{id}/deactivate` dan `.../activate` -> item admin terbaru. Idempoten (yang sudah di status tujuan dikembalikan apa adanya, tanpa log).
+- Kirim ulang undangan tidak butuh endpoint baru: `POST /api/admin/admins` yang sudah ada mengirim ulang untuk admin berstatus menunggu undangan (token baru, token lama mati).
+
+**Status (`AdminStatus`, diturunkan dari kolom yang ada):** `INACTIVE` (active=false, mengalahkan yang lain) | `ACTIVE` (aktif + terverifikasi) | `PENDING` (belum terverifikasi; `invitationExpiresAt` terisi hanya bila menunggu undangan, null untuk admin pertama yang belum klik link verifikasi).
+
+**Aturan penonaktifan:**
+1. Tidak boleh menonaktifkan diri sendiri -> 400 (`CannotDeactivateSelfException`; email dibandingkan tanpa peduli huruf besar/kecil).
+2. Admin aktif terakhir dilindungi -> 409 (`LastActiveAdminException`). Karena pemanggil selalu admin aktif dan tidak boleh menarget diri sendiri, aturan ini praktis hanya bisa kena saat balapan; penjagaannya: seluruh `deactivate` diserialkan dengan `pg_advisory_xact_lock` (kunci `7_201_810_002L`, beda dari kunci pendaftaran admin) dan jumlah admin aktif dihitung SETELAH kunci diambil. Hanya admin aktif+terverifikasi yang dihitung, jadi membatalkan undangan admin PENDING tidak terhalang.
+3. Id yang tidak ada ATAU bukan akun ADMIN -> 404 (`AdminNotFoundException`; user biasa tidak dibedakan dari "tidak ada").
+4. Efek langsung: `JwtAuthenticationFilter` menolak user nonaktif di setiap request (token yang masih berlaku pun -> 401, FE diarahkan ke sign in); login admin -> **403 dengan `code: "ACCOUNT_DEACTIVATED"`** (hanya SETELAH password benar; password salah tetap 401 generik). `GlobalExceptionHandler` mendapat field opsional `code`; 403 "belum verifikasi" tetap TANPA `code`, itulah pembeda untuk FE (form kirim ulang verifikasi hanya untuk yang tanpa `code`).
+5. Token reset password dihapus saat dinonaktifkan; `forgot-password` untuk akun nonaktif diabaikan diam-diam (respons tetap generik); `reset-password`/`validate` menolak akun nonaktif.
+6. **Penyimpangan kecil dari analisis:** token undangan TIDAK dihapus saat dinonaktifkan -- selama nonaktif undangan ditolak (validasi & terima), dan `invite` ke admin nonaktif -> 409 ("aktifkan kembali dulu"). Alasannya: bila token dihapus, admin PENDING yang diaktifkan kembali tidak bisa dibedakan dari admin pertama yang belum verifikasi dan tidak bisa diundang ulang. Dengan token dipertahankan, setelah diaktifkan kembali statusnya PENDING dengan masa berlaku lama (FE menandai kedaluwarsa) dan "kirim ulang" berjalan lewat endpoint undangan yang sama.
+7. Log aktivitas: `ADMIN_DEACTIVATED:<email target>` / `ADMIN_REACTIVATED:<email target>` atas nama pelaku (dipotong 255 karakter sesuai kolom `activity`).
+
+**Berkas:** `User.active`, `UserRepository` (`findAllByUserType(Pageable)`, `countByUserTypeAndActiveTrueAndVerifiedTrue`), `AdminManagementService(Impl)` (`listAdmins`, `deactivate`, `activate`), `AdminManagementController`, DTO `AdminListItemResponseDTO`, `AdminListResponseDTO`, enum `AdminStatus`, exception `CannotDeactivateSelfException`, `LastActiveAdminException`, `AdminNotFoundException`, `AccountDeactivatedException`; diubah: `JwtAuthenticationFilter`, `AdminAuthServiceImpl` (login, undangan), `AuthServiceImpl` (forgot/reset/validate), `GlobalExceptionHandler`.
+
+**Batasan yang perlu diketahui:**
+- Token JWT lama milik admin yang diaktifkan kembali berlaku lagi sampai habis masa berlakunya (password tidak berubah). Bila perlu dicabut paksa, ganti password lewat reset.
+- Admin pertama yang belum verifikasi email bisa dinonaktifkan/diaktifkan seperti admin lain; `registration-status` tetap menghitung admin nonaktif, jadi pendaftaran admin pertama tidak pernah terbuka lagi.
+- Menonaktifkan tidak mencabut link verifikasi email admin pertama (link tetap bisa memverifikasi, tetapi akun nonaktif tetap tidak bisa login).
+- Belum ada pencarian/filter status pada daftar, hapus admin, atau penonaktifan akun user biasa (kolom `is_active` sudah ada dan filter JWT berlaku untuk semua tipe, tetapi belum ada API untuk mengubahnya selain admin).
+- `lockAdvisory` memakai query native PostgreSQL yang belum dijalankan terhadap PostgreSQL sungguhan (lihat Verifikasi).
+
+**Test baru/diperluas:**
+- `AdminListAndDeactivateTest` (17): urutan terbaru dulu, pemaksaan `page`/`size`, nilai efektif di respons, status/`self`/masa berlaku undangan per baris, total & halaman di luar jangkauan, nonaktifkan (kunci, token reset, log), diri sendiri, admin aktif terakhir, PENDING tidak dihitung, id tak dikenal/bukan admin, idempoten, pemotongan teks log, aktifkan, undangan tetap bisa dikirim ulang setelah aktif kembali, invite ke admin nonaktif -> 409.
+- `GlobalExceptionHandlerAdminTest` (3): status & body error, `code` hanya pada nonaktif.
+- `AdminListDtoJsonTest` (3): nama field JSON tepat sama dengan kontrak FE (`items/page/size/totalItems/totalPages`, `self`, `invitationExpiresAt: null` tetap muncul, enum sebagai string).
+- Diperluas: `AdminAuthServiceTest` (login nonaktif = 403 ber-code, password salah tidak membocorkan apa pun, aktif kembali bisa login, undangan ditolak saat nonaktif lalu berlaku lagi), `JwtAuthenticationFilterRoleTest` (token yang sama ditolak saat nonaktif dan diterima lagi saat aktif), `AdminPasswordFlowTest` (forgot/reset akun nonaktif).
+
+**Verifikasi:** seluruh 331 berkas Java lolos pemeriksaan sintaks (parser javac), semua `import com.example.app...` ter-resolve, dan nama method/field yang dipakai test sudah dicocokkan dengan definisinya. **`mvn test` TIDAK dapat dijalankan di lingkungan ini (Maven Central tidak terjangkau)**, jadi kode & test baru belum dikompilasi/dijalankan dengan Spring/Lombok/JUnit; jalankan `mvn test` sebelum merge.
+
+**Cek manual (setelah backend jalan; V20 akan terpasang otomatis):**
+1. Login admin, `GET /api/admin/admins?page=0&size=2` -> `items` terbaru dulu, `self:true` pada baris sendiri, `totalPages` benar; `page=99` -> `items` kosong; `size=500` -> `size:50` di respons.
+2. Undang 2-3 admin lewat `POST /api/admin/admins`, ulangi GET: admin baru muncul di halaman 1 berstatus `PENDING` dengan `invitationExpiresAt`.
+3. `POST .../{id}/deactivate` pada admin kedua (yang sudah login di sesi lain): respons `INACTIVE`; token sesi lain -> 401; login admin itu -> 403 dengan `code:"ACCOUNT_DEACTIVATED"`; `forgot-password` untuknya -> 200 generik tanpa email.
+4. `deactivate` pada diri sendiri -> 400; pada id user biasa -> 404. Dua admin saling `deactivate` bersamaan (dua curl paralel) -> salah satunya 409.
+5. `.../activate` -> `ACTIVE`; admin itu bisa login lagi.
+6. Kirim ulang undangan: `POST /api/admin/admins` dengan email admin `PENDING` -> email baru terkirim; ke email admin nonaktif -> 409.
+
+
+## 32. Fitur Admin: menu Admin -- daftar berpaginasi, nonaktifkan, aktifkan kembali, kirim ulang undangan (Pigay, frontend)
+
+Mengikuti kontrak backend bagian 31 (`GET /api/admin/admins`, `POST .../{id}/deactivate|activate`). Semua kode di `frontend/src/modules/admin/`.
+
+**Sidebar:** menu **Admin** berada paling atas, sebelum User (`utils/adminMenu.ts`, `ADMIN_MENU`). Halaman "Undang Admin" tetap menyorot menu Admin.
+
+**Halaman baru `views/AdminListView.vue` (`/admin/admins`, nama route `admin-admins`):**
+- Tabel Nama / Email / Status (badge) / Dibuat / Aksi, 10 baris per halaman. Halaman disimpan di URL (`?page=2`, mulai dari 1; API tetap mulai dari 0), jadi refresh dan tombol Back tetap di halaman yang sama. `?page=99` atau halaman yang kosong setelah data berkurang otomatis pindah ke halaman terakhir.
+- Baris sendiri berlabel "(Anda)" tanpa tombol aksi. Aksi lain mengikuti status: Aktif -> Nonaktifkan; Nonaktif -> Aktifkan; Menunggu undangan -> Kirim ulang undangan + Nonaktifkan; Menunggu verifikasi email (admin pertama) -> Nonaktifkan.
+- Nonaktifkan memakai dialog konfirmasi (`AdminConfirmDialog`); Aktifkan dan Kirim ulang undangan langsung jalan. Kirim ulang memakai endpoint undangan yang sama (`adminManagementService.invite`).
+- Setelah aksi, daftar dimuat ulang di halaman yang sama. Error 404/409 (data sudah berubah di server, mis. admin aktif terakhir) juga memuat ulang. Ada state memuat, kosong, dan gagal (tombol "Coba lagi"). Respons lama yang terlambat tidak menimpa data baru. Tombol dan pager terkunci selama memuat.
+
+**Berkas baru:** `utils/adminMenu.ts`, `utils/adminList.ts` (logika murni agar bisa diuji), `components/AdminConfirmDialog.vue`, `components/AdminPager.vue`, `views/AdminListView.vue`.
+**Diubah:** `types/admin-auth.types.ts`, `services/adminManagement.service.ts` (`list/deactivate/activate`), `utils/adminErrors.ts` (`code`, `isAccountDeactivated`, `offersVerificationResend`), `components/AdminSidebar.vue`, `routes.ts`, `AdminInviteView.vue` (Kembali -> daftar admin, tautan "Lihat daftar admin" setelah sukses), `AdminDashboardView.vue` (kartu "Kelola Admin"), `AdminSigninView.vue`.
+**Sign in admin:** 403 `ACCOUNT_DEACTIVATED` menampilkan pesan akun dinonaktifkan **tanpa** form kirim ulang verifikasi; 403 lain (belum diverifikasi) tetap menampilkan form itu.
+
+**Test:** `adminMenu.test.ts`, `adminList.test.ts` (baru); `adminRoutes`, `guards`, `adminErrors` diperluas. Total 54 test Node lulus; 8 mutasi (aksi baris sendiri, kirim ulang, batas kedaluwarsa, offset halaman URL, sorotan menu, nama route, urutan cek nonaktif) semuanya tertangkap.
+
+**Verifikasi:** type-check strict (shim) bersih kecuali 4 artefak lama shim, pemeriksa template 14 berkas `.vue` admin bersih. **`npm run build`/`vue-tsc -b` dan tampilan browser TIDAK dapat dijalankan di lingkungan ini (registry npm diblokir)**; jalankan `npm test` dan `npm run build` sebelum merge.
+
+**Catatan:** `invitationExpiresAt` adalah waktu server tanpa zona; FE membandingkannya dengan jam browser, jadi label "Undangan kedaluwarsa" bisa meleset jika zona waktu server dan browser berbeda (backend tetap menjadi penentu sebenarnya saat undangan dipakai).
+
+**Cek manual:**
+1. Sidebar: Admin muncul pertama, sebelum User; di /admin/admins/new menu Admin tetap menyala.
+2. Buka /admin/admins: baris sendiri berlabel (Anda) tanpa tombol. Dengan >10 admin, pager bekerja dan `?page=2` bertahan setelah refresh.
+3. Undang admin baru, kembali ke daftar: muncul "Menunggu undangan". Kirim ulang undangan -> email baru terkirim.
+4. Nonaktifkan admin lain -> dialog konfirmasi -> status Nonaktif; sesinya di browser lain langsung ke sign in. Login admin itu -> pesan nonaktif tanpa form kirim ulang.
+5. Aktifkan kembali -> bisa login lagi. Coba nonaktifkan admin aktif terakhir (dari sesi lain) -> pesan error dan daftar tersinkron.

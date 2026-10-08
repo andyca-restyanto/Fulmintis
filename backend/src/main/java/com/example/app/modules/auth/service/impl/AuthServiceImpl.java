@@ -202,6 +202,20 @@ public class AuthServiceImpl implements AuthService {
 
         User user = maybeUser.get();
 
+        // Admin yang masih berstatus UNDANGAN (belum menerima undangan => belum terverifikasi)
+        // tidak boleh lewat jalur reset: password-nya dibuat lewat accept-invitation, dan reset
+        // di sini akan meninggalkan akun tanpa verifikasi dengan token undangan yang masih hidup.
+        // Diam-diam (respons ke klien tetap generik) agar tidak membuka enumerasi email.
+        if (UserTypeCode.ADMIN.equals(user.getUserType()) && !user.isVerified()) {
+            return;
+        }
+
+        // Akun nonaktif tidak dikirimi link reset (tidak ada jalan masuk lewat email). Diam-diam
+        // juga: respons ke klien tetap generik.
+        if (!user.isActive()) {
+            return;
+        }
+
         // Cooldown per email: link yang baru dikirim < 60 detik lalu -> abaikan
         // diam-diam (respons ke klien tetap generik). Mencegah endpoint ini
         // dipakai membanjiri inbox satu korban; waktu kirim dihitung dari
@@ -235,7 +249,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByResetPasswordToken(token)
                 .orElseThrow(InvalidOrExpiredResetTokenException::new);
 
-        if (user.getResetPasswordTokenExpiresAt() == null
+        if (!user.isActive()
+                || user.getResetPasswordTokenExpiresAt() == null
                 || user.getResetPasswordTokenExpiresAt().isBefore(LocalDateTime.now())) {
             throw new InvalidOrExpiredResetTokenException();
         }
@@ -248,7 +263,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByResetPasswordToken(request.getToken())
                 .orElseThrow(InvalidOrExpiredResetTokenException::new);
 
-        if (user.getResetPasswordTokenExpiresAt() == null
+        if (!user.isActive()
+                || user.getResetPasswordTokenExpiresAt() == null
                 || user.getResetPasswordTokenExpiresAt().isBefore(LocalDateTime.now())) {
             throw new InvalidOrExpiredResetTokenException();
         }

@@ -1,7 +1,7 @@
 <!-- frontend/src/modules/auth/views/ForgotPasswordView.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { authService } from '../services/auth.service';
 import type { ApiValidationErrorResponse } from '../types/register.types';
@@ -9,7 +9,12 @@ import BugIcon from '@/shared/components/icons/BugIcon.vue';
 import { BRAND_NAME } from '@/shared/config/brand';
 import CheckCircleIcon from '@/shared/components/icons/CheckCircleIcon.vue';
 
+const route = useRoute();
 const router = useRouter();
+
+// Dipakai dua area: user (/auth/forgot-password) dan admin (/admin/forgot-password,
+// route meta.area = 'admin'). Bedanya hanya tujuan tombol kembali ke sign in.
+const isAdminArea = route.meta.area === 'admin';
 
 const email = ref('');
 const isSubmitting = ref(false);
@@ -55,7 +60,7 @@ async function handleSubmit() {
 }
 
 function backToSignIn() {
-  router.push({ name: 'auth-signin' });
+  router.push({ name: isAdminArea ? 'admin-signin' : 'auth-signin' });
 }
 </script>
 

@@ -56,6 +56,25 @@ class RateLimitFilterAdminTest {
     }
 
     @Test
+    void changePasswordIsLimitedPerIpAndIndependentFromOtherRules() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            assertEquals(200, hit("POST", "/api/auth/change-password"), "percobaan ke-" + (i + 1));
+        }
+        assertEquals(429, hit("POST", "/api/auth/change-password"));
+
+        // aturan lain (jendela terpisah) tidak ikut terkunci
+        assertEquals(200, hit("POST", "/api/auth/login"));
+        assertEquals(200, hit("POST", "/api/auth/forgot-password"));
+    }
+
+    @Test
+    void changePasswordLimitAppliesOnlyToPost() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            assertEquals(200, hit("GET", "/api/auth/change-password"));
+        }
+    }
+
+    @Test
     void publicAdminLookupsAreLimited() throws Exception {
         for (int i = 0; i < 30; i++) {
             hit("GET", "/api/admin/auth/registration-status");

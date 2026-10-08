@@ -51,3 +51,13 @@ test('token yang tinggal beberapa detik dianggap habis (toleransi selisih jam)',
   tokenStorage.setToken(fakeJwt({ sub: 'a@b.com', exp: inSeconds(5) }));
   assert.equal(tokenStorage.isTokenExpired(), true);
 });
+
+test('mengganti token setelah ubah password (token baru) mempertahankan role ADMIN', () => {
+  tokenStorage.setToken(fakeJwt({ sub: 'a@b.com', role: 'ADMIN', pv: 'lama', exp: inSeconds(3600) }));
+  assert.equal(tokenStorage.getRole(), 'ADMIN');
+
+  tokenStorage.setToken(fakeJwt({ sub: 'a@b.com', role: 'ADMIN', pv: 'baru', exp: inSeconds(7200) }));
+  assert.equal(tokenStorage.getRole(), 'ADMIN');
+  assert.equal(tokenStorage.getTokenSubject(), 'a@b.com');
+  assert.equal(tokenStorage.hasValidToken(), true);
+});

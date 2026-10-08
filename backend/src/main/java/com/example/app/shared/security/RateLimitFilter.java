@@ -53,7 +53,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${app.rate-limit.register-per-minute:10}")
     private int registerPerMinute;
 
-    // forgot-password, resend-verification, reset-password (memicu email / pakai token)
+    // forgot-password, resend-verification, reset-password, change-password (memicu email / pakai token / cek password)
     @Value("${app.rate-limit.email-per-minute:5}")
     private int emailPerMinute;
 
@@ -110,6 +110,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 case "/api/auth/forgot-password" -> { rule = "forgot"; limit = emailPerMinute; }
                 case "/api/auth/resend-verification" -> { rule = "resend"; limit = emailPerMinute; }
                 case "/api/auth/reset-password" -> { rule = "reset"; limit = emailPerMinute * 2; }
+                // Ganti password saat login (user + admin): menebak "password saat ini" dengan token curian
+                case "/api/auth/change-password" -> { rule = "change-password"; limit = emailPerMinute; }
                 case "/api/admin/auth/login" -> { rule = "admin-login"; limit = loginPerMinute; }
                 case "/api/admin/auth/register" -> { rule = "admin-register"; limit = adminRegisterPerMinute; }
                 case "/api/admin/auth/accept-invitation" -> { rule = "admin-accept"; limit = emailPerMinute * 2; }

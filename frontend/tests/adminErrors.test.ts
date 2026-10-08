@@ -1,7 +1,7 @@
 // filepath: /frontend/tests/adminErrors.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readAdminError, NETWORK_ERROR_MESSAGE, DEFAULT_ERROR_MESSAGE } from '../src/modules/admin/utils/adminErrors.ts';
+import { readAdminError, isAccountDeactivated, offersVerificationResend, NETWORK_ERROR_MESSAGE, DEFAULT_ERROR_MESSAGE } from '../src/modules/admin/utils/adminErrors.ts';
 
 const axiosError = (status: number, data?: unknown) => ({ isAxiosError: true, response: { status, data } });
 
@@ -38,4 +38,21 @@ test('server tidak terjangkau atau bukan error axios -> pesan jaringan, status n
     assert.equal(info.message, NETWORK_ERROR_MESSAGE);
     assert.deepEqual(info.fieldErrors, {});
   }
+});
+
+test('403 ACCOUNT_DEACTIVATED dibedakan dari 403 belum terverifikasi', () => {
+  const off = readAdminError(axiosError(403, { message: 'Akun dinonaktifkan', code: 'ACCOUNT_DEACTIVATED' }));
+  assert.equal(off.code, 'ACCOUNT_DEACTIVATED');
+  assert.equal(isAccountDeactivated(off), true);
+  assert.equal(offersVerificationResend(off), false);
+
+  const unverified = readAdminError(axiosError(403, { message: 'Belum diverifikasi' }));
+  assert.equal(unverified.code, null);
+  assert.equal(isAccountDeactivated(unverified), false);
+  assert.equal(offersVerificationResend(unverified), true);
+
+  // kode itu hanya berarti pada 403
+  const other = readAdminError(axiosError(409, { message: 'x', code: 'ACCOUNT_DEACTIVATED' }));
+  assert.equal(isAccountDeactivated(other), false);
+  assert.equal(offersVerificationResend(other), false);
 });

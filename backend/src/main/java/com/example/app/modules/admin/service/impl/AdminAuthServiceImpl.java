@@ -7,6 +7,7 @@ import com.example.app.modules.admin.dto.AdminProfileResponseDTO;
 import com.example.app.modules.admin.dto.AdminRegisterRequestDTO;
 import com.example.app.modules.admin.dto.AdminRegisterResponseDTO;
 import com.example.app.modules.admin.dto.AdminRegistrationStatusResponseDTO;
+import com.example.app.modules.admin.exception.AccountDeactivatedException;
 import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
 import com.example.app.modules.admin.exception.InvalidAdminBootstrapCodeException;
 import com.example.app.modules.admin.exception.InvalidAdminInvitationException;
@@ -150,6 +151,11 @@ public class AdminAuthServiceImpl implements AdminAuthService {
             throw new InvalidCredentialsException();
         }
 
+        // Dicek SEBELUM verifikasi: admin nonaktif mendapat 403 ber-code sendiri (FE tidak boleh
+        // menawarkan "kirim ulang verifikasi"). Baru sampai sini setelah password terbukti benar.
+        if (!user.isActive()) {
+            throw new AccountDeactivatedException();
+        }
         if (!user.isVerified()) {
             throw new AccountNotVerifiedException();
         }
@@ -220,7 +226,9 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         User invitee = userRepository.findByAdminInvitationToken(token)
                 .orElseThrow(InvalidAdminInvitationException::new);
 
-        boolean pending = UserTypeCode.ADMIN.equals(invitee.getUserType()) && !invitee.isVerified();
+        // Admin nonaktif tidak bisa menerima undangan (undangan tidak dihapus, hanya diblokir).
+        boolean pending = UserTypeCode.ADMIN.equals(invitee.getUserType()) && !invitee.isVerified()
+                && invitee.isActive();
         boolean expired = invitee.getAdminInvitationExpiresAt() == null
                 || invitee.getAdminInvitationExpiresAt().isBefore(LocalDateTime.now());
         if (!pending || expired) {

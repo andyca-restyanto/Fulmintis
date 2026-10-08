@@ -59,7 +59,7 @@ test('halaman sign in dengan query notifikasi tetap dibuka walau sudah login', (
 });
 
 test('halaman publik non-entry tetap terbuka untuk semua peran', () => {
-  for (const page of ['auth-forgot-password', 'auth-reset-password', 'admin-accept-invitation', 'admin-reset-password']) {
+  for (const page of ['auth-forgot-password', 'auth-reset-password', 'admin-accept-invitation', 'admin-forgot-password', 'admin-reset-password']) {
     for (const session of [none, expired, user, admin]) {
       assert.equal(resolveGuard(publicPage(page), session), true, `${page}`);
     }
@@ -73,4 +73,20 @@ test('pemetaan nama route per peran', () => {
   assert.equal(homeRouteFor('USER'), 'dashboard');
   assert.equal(signinRouteFor('ADMIN'), 'admin-signin');
   assert.equal(signinRouteFor('USER'), 'auth-signin');
+});
+
+test('ubah password admin: hanya ADMIN yang boleh; tamu & user biasa dialihkan', () => {
+  const page = adminPage('admin-change-password');
+  assert.equal(resolveGuard(page, admin), true);
+  assert.deepEqual(resolveGuard(page, user), { name: 'dashboard' });
+  assert.deepEqual(resolveGuard(page, none), { name: 'admin-signin' });
+  assert.deepEqual(resolveGuard(page, expired), { name: 'admin-signin', query: { expired: 'true' } });
+});
+
+test('daftar admin: hanya ADMIN yang boleh; tamu & user biasa dialihkan', () => {
+  const page = adminPage('admin-admins');
+  assert.equal(resolveGuard(page, admin), true);
+  assert.deepEqual(resolveGuard(page, user), { name: 'dashboard' });
+  assert.deepEqual(resolveGuard(page, none), { name: 'admin-signin' });
+  assert.deepEqual(resolveGuard(page, expired), { name: 'admin-signin', query: { expired: 'true' } });
 });

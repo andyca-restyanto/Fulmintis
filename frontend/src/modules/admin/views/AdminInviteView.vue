@@ -60,7 +60,7 @@ async function handleSubmit() {
     <button
       type="button"
       class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
-      @click="router.push({ name: 'admin-dashboard' })"
+      @click="router.push({ name: 'admin-admins' })"
     >
       <ArrowLeftIcon :size="16" />
       Kembali
@@ -101,10 +101,19 @@ async function handleSubmit() {
       </div>
 
       <p v-if="generalError" class="text-sm text-red-600">{{ generalError }}</p>
-      <p v-if="successMessage" class="flex items-start gap-2 text-sm text-green-600">
-        <CheckCircleIcon :size="18" class="mt-0.5 shrink-0" />
-        {{ successMessage }}
-      </p>
+      <div v-if="successMessage" class="text-sm text-green-600">
+        <p class="flex items-start gap-2">
+          <CheckCircleIcon :size="18" class="mt-0.5 shrink-0" />
+          {{ successMessage }}
+        </p>
+        <button
+          type="button"
+          class="mt-2 font-semibold text-gray-900 underline-offset-2 hover:underline"
+          @click="router.push({ name: 'admin-admins' })"
+        >
+          Lihat daftar admin
+        </button>
+      </div>
 
       <button
         type="submit"

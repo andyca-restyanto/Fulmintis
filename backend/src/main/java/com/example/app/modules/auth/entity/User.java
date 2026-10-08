@@ -50,6 +50,15 @@ public class User {
     @Column(name = "reset_password_token_expires_at")
     private LocalDateTime resetPasswordTokenExpiresAt;
 
+    // ---- Status akun ----
+    // false = dinonaktifkan (saat ini hanya lewat menu Admin): tidak bisa login dan token
+    // yang sudah terbit ditolak JwtAuthenticationFilter. columnDefinition membuat
+    // ddl-auto=update (lokal) tetap bisa menambah kolom NOT NULL ke tabel yang sudah berisi;
+    // di prod kolom dibuat Flyway V20.
+    @Column(name = "is_active", nullable = false, columnDefinition = "boolean not null default true")
+    @Builder.Default
+    private boolean active = true;
+
     // ---- Undangan admin (diisi AdminManagementService.invite) ----
     // Token + masa berlaku terpisah dari verification/reset-password supaya
     // endpoint verifikasi/reset user biasa tidak bisa memakai token undangan.

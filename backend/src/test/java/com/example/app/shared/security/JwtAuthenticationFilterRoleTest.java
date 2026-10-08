@@ -100,6 +100,40 @@ class JwtAuthenticationFilterRoleTest {
     }
 
     @Test
+    void adminTokenIsRejectedAfterPasswordChangeButNewTokenWorks() throws Exception {
+        User admin = AdminTestSupport.user("a@example.com", UserTypeCode.ADMIN, true, "Str0ng!Pass");
+        when(userRepository.findByEmail("a@example.com")).thenReturn(Optional.of(admin));
+        String oldToken = jwtService.generateToken("a@example.com", admin.getPassword(), Roles.ADMIN);
+        assertEquals("ROLE_ADMIN", authority(run(oldToken)));
+
+        // password berubah (ubah/reset password) -> token lama dicabut, token baru berlaku
+        SecurityContextHolder.clearContext();
+        admin.setPassword(AdminTestSupport.ENCODER.encode("Baru#Pass9"));
+        assertNull(run(oldToken));
+
+        SecurityContextHolder.clearContext();
+        String newToken = jwtService.generateToken("a@example.com", admin.getPassword(), Roles.ADMIN);
+        assertEquals("ROLE_ADMIN", authority(run(newToken)));
+    }
+
+    @Test
+    void deactivatedAdminLosesAccessImmediatelyAndRegainsItWhenReactivated() throws Exception {
+        User admin = AdminTestSupport.user("a@example.com", UserTypeCode.ADMIN, true, "Str0ng!Pass");
+        when(userRepository.findByEmail("a@example.com")).thenReturn(Optional.of(admin));
+        String token = jwtService.generateToken("a@example.com", admin.getPassword(), Roles.ADMIN);
+        assertEquals("ROLE_ADMIN", authority(run(token)));
+
+        // Dinonaktifkan: token yang SAMA (masih berlaku & tanda tangan benar) langsung ditolak.
+        SecurityContextHolder.clearContext();
+        admin.setActive(false);
+        assertNull(run(token));
+
+        SecurityContextHolder.clearContext();
+        admin.setActive(true);
+        assertEquals("ROLE_ADMIN", authority(run(token)));
+    }
+
+    @Test
     void unverifiedAdminIsNotAuthenticated() throws Exception {
         User admin = AdminTestSupport.user("a@example.com", UserTypeCode.ADMIN, false, "Str0ng!Pass");
         when(userRepository.findByEmail("a@example.com")).thenReturn(Optional.of(admin));

@@ -23,7 +23,8 @@ import java.util.Optional;
  * Baca "Authorization: Bearer <jwt>". Token dianggap sah HANYA kalau:
  * <ol>
  *   <li>tanda tangan valid & belum kedaluwarsa,</li>
- *   <li>user pemilik token MASIH ada di DB dan sudah verified, dan</li>
+ *   <li>user pemilik token MASIH ada di DB, sudah verified, dan AKTIF (admin yang dinonaktifkan
+ *       langsung kehilangan akses tanpa menunggu token habis), dan</li>
  *   <li>versi password di token ({@code pv}) sama dengan password user
  *       sekarang -- jadi token lama otomatis mati setelah ganti/reset password.</li>
  * </ol>
@@ -80,7 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         Optional<User> maybeUser = userRepository.findByEmail(parsed.get().email());
-        if (maybeUser.isEmpty() || !maybeUser.get().isVerified()) {
+        if (maybeUser.isEmpty() || !maybeUser.get().isVerified() || !maybeUser.get().isActive()) {
             return Optional.empty();
         }
 
