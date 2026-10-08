@@ -104,6 +104,7 @@ test('setiap tujuan router.push({ name }) di view admin & lupa/reset password ad
     '../src/modules/admin/views/AdminInviteView.vue',
     '../src/modules/admin/views/AdminChangePasswordView.vue',
     '../src/modules/admin/views/AdminListView.vue',
+    '../src/modules/admin/views/AdminUserListView.vue',
     '../src/modules/admin/views/AdminDashboardView.vue',
     '../src/modules/auth/views/ForgotPasswordView.vue',
     '../src/modules/auth/views/ResetPasswordView.vue',
@@ -150,4 +151,17 @@ test('service daftar admin mengirim page & size ke /admin/admins', () => {
   assert.match(source, /'\/admin\/admins'[\s\S]*params:\s*\{\s*page,\s*size\s*\}/);
   assert.match(source, /deactivate/);
   assert.match(source, /activate/);
+});
+
+test('menu User memakai halaman daftar user (bukan Coming soon) dengan path /admin/users', () => {
+  const parent = adminRoutes.find((r) => r.path === '/admin');
+  const route = parent?.children?.find((c) => c.name === 'admin-users');
+  assert.ok(route);
+  assert.equal(route.path, 'users');
+  assert.equal(route.meta?.title, 'User');
+  assert.match(String(route.component), /AdminUserListView/);
+  // menu lain yang belum dibuat tetap Coming soon
+  for (const name of ['admin-user-logs', 'admin-payments', 'admin-ai-token-usage']) {
+    assert.match(String(parent?.children?.find((c) => c.name === name)?.component), /ComingSoonView/, name);
+  }
 });

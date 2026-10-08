@@ -71,11 +71,12 @@ const adminRoutes: RouteRecordRaw[] = [
         component: () => import('./views/AdminChangePasswordView.vue'),
         meta: { title: 'Ubah Password' },
       },
-      // Menu sidebar -- sementara semuanya halaman "Coming soon".
+      // Menu sidebar -- selain Admin dan User, sementara halaman "Coming soon".
       {
+        // Menu User: daftar user non-admin (paginasi, cari email/nama, filter tier) dan ubah tier.
         path: 'users',
         name: 'admin-users',
-        component: () => import('./views/ComingSoonView.vue'),
+        component: () => import('./views/AdminUserListView.vue'),
         meta: { title: 'User' },
       },
       {

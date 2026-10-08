@@ -10,7 +10,10 @@ import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
 import com.example.app.modules.admin.exception.CannotDeactivateSelfException;
 import com.example.app.modules.admin.exception.InvalidAdminBootstrapCodeException;
 import com.example.app.modules.admin.exception.InvalidAdminInvitationException;
+import com.example.app.modules.admin.exception.InvalidUserQueryException;
+import com.example.app.modules.admin.exception.InvalidUserTierException;
 import com.example.app.modules.admin.exception.LastActiveAdminException;
+import com.example.app.modules.admin.exception.UserNotFoundException;
 import com.example.app.modules.auth.exception.AccountNotVerifiedException;
 import com.example.app.modules.auth.exception.EmailAlreadyExistsException;
 import com.example.app.modules.auth.exception.IncorrectCurrentPasswordException;
@@ -92,6 +95,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AdminNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleAdminNotFound(AdminNotFoundException ex) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidUserTierException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidUserTier(InvalidUserTierException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidUserQueryException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidUserQuery(InvalidUserQueryException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(AccountDeactivatedException.class)

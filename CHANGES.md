@@ -1429,3 +1429,61 @@ Mengikuti kontrak backend bagian 31 (`GET /api/admin/admins`, `POST .../{id}/dea
 3. Undang admin baru, kembali ke daftar: muncul "Menunggu undangan". Kirim ulang undangan -> email baru terkirim.
 4. Nonaktifkan admin lain -> dialog konfirmasi -> status Nonaktif; sesinya di browser lain langsung ke sign in. Login admin itu -> pesan nonaktif tanpa form kirim ulang.
 5. Aktifkan kembali -> bisa login lagi. Coba nonaktifkan admin aktif terakhir (dari sesi lain) -> pesan error dan daftar tersinkron.
+
+
+## 33. Fitur Admin: menu User -- daftar berpaginasi, cari email/nama, filter tier, ubah tier (Luhut, backend)
+
+Semua kode di `backend/src/main/java/com/example/app/modules/admin/` (modul admin), kecuali repository.
+
+**Endpoint baru (hanya ROLE_ADMIN lewat `/api/admin/**`):**
+- `GET /api/admin/users?page=0&size=10&q=&tier=` -- daftar user NON-admin, terbaru dulu (`createdAt` DESC lalu `id` DESC). `size` 1..50 (default 10; <1 menjadi 10, >50 menjadi 50), `page<0` menjadi 0, halaman di luar jangkauan memberi `items` kosong dengan total benar. `q` = email atau nama (trim, tanpa peduli huruf besar/kecil, cocok sebagian, maks 100 karakter -> 400). `tier` = `FREE|VIP_MONTHLY|VIP_YEARLY`; nilai lain, termasuk `ADMIN` dan huruf kecil, ditolak 400 (tidak diabaikan diam-diam). `q` dan `tier` digabung dengan AND; `totalItems`/`totalPages` mengikuti hasil filter. User nonaktif dan belum terverifikasi ikut tampil.
+- `PATCH /api/admin/users/{id}/tier` body `{"userType":"VIP_YEARLY"}` -- mengubah tier. Tier di luar tiga pilihan di atas -> 400; id tidak ada atau akun ADMIN -> 404; tier sama -> 200 tanpa simpan/log (idempoten). Perubahan dicatat ke activity log: `USER_TIER_CHANGED:<email>:<lama>-><baru>`.
+
+**Keputusan teknis:**
+- Filter memakai `Specification` (`UserRepository extends JpaSpecificationExecutor<User>`, `UserSpecifications`), bukan JPQL dengan parameter opsional, karena parameter `null` di PostgreSQL + Hibernate sering gagal dikenali tipenya. Syarat hanya ditambahkan bila filternya terisi.
+- Karakter `\`, `%`, `_` pada `q` di-escape (`LIKE ... ESCAPE '\'`), jadi mengetik `%` tidak mencocokkan semua user. Nama `null` aman (`coalesce`).
+- Label tier diambil dengan satu query `UserTypeLookupService.getLabelsByCodes` untuk seluruh halaman (database `master_data`), jatuh ke kode bila label tidak ada.
+- Tier dibaca dari DB tiap kali dipakai, jadi perubahan langsung berlaku untuk kuota AI tanpa login ulang; job AI yang sudah berjalan memakai tier yang tersimpan di record job-nya.
+- Migrasi `V21__add_users_user_type_created_at_index.sql`: index `(user_type, created_at DESC)`. Pencarian `%kata%` tidak memakai index btree; bila user sudah puluhan ribu, tambahkan index `pg_trgm` (butuh ekstensi di PostgreSQL produksi) -- belum dikerjakan.
+
+**Berkas baru:** `controller/UserManagementController`, `service/UserManagementService`, `service/impl/UserManagementServiceImpl`, `service/UserSpecifications`, `dto/UserListItemResponseDTO`, `dto/UserListResponseDTO`, `dto/UpdateUserTierRequestDTO`, `exception/UserNotFoundException` (404), `exception/InvalidUserTierException` (400), `exception/InvalidUserQueryException` (400), `V21__...sql`.
+**Diubah:** `UserRepository` (+`JpaSpecificationExecutor`), `GlobalExceptionHandler` (3 handler baru).
+
+**Test baru/diperluas:** `UserManagementServiceTest` (urutan & pemaksaan page/size, total & halaman kosong, isi baris & label satu query, syarat filter yang dirangkai, tier/query tidak valid ditolak, batas 100 karakter setelah trim, ubah tier + log, kuota AI ikut berubah, idempoten, trim, admin/id tak dikenal 404, user nonaktif tetap bisa diubah, master_data tidak lengkap, pemotongan log), `UserSpecificationsTest` (escape LIKE, syarat yang dirangkai), `UserDtoJsonAndValidationTest` (nama field JSON = kontrak FE `UserListPage/UserListItem`, `name:null` tetap muncul, body PATCH wajib `userType`), `GlobalExceptionHandlerAdminTest` (+3 status).
+
+**Verifikasi:** seluruh 344 berkas Java lolos pemeriksaan sintaks (parser javac) dan semua `import com.example.app...` ter-resolve. **`mvn test` TIDAK dapat dijalankan di lingkungan ini (Maven Central tidak terjangkau)**, jadi kode & test baru belum dikompilasi/dijalankan dengan Spring/Lombok/JUnit/Mockito; terutama `UserSpecificationsTest` dan filter di `UserManagementServiceTest` yang memakai mock `CriteriaBuilder` perlu dijalankan. Query `Specification` ke PostgreSQL asli juga belum teruji. Jalankan `mvn test` sebelum merge.
+
+**Cek manual (setelah backend jalan; V21 terpasang otomatis):**
+1. Login admin, `GET /api/admin/users` -> hanya user non-admin, terbaru dulu, `size:10`; `size=500` -> `size:50`; `page=99` -> `items` kosong, total benar.
+2. `?q=budi` (email atau nama, huruf besar/kecil bebas); `?q=%` dan `?q=_` -> hanya yang benar-benar mengandung karakter itu (bukan semua user); `?q=` + 101 karakter -> 400.
+3. `?tier=FREE`, `?tier=VIP_MONTHLY`, kombinasi `?q=budi&tier=FREE`; `?tier=ADMIN` / `?tier=free` -> 400. Pastikan `totalItems` mengikuti filter.
+4. Pastikan akun admin tidak pernah muncul, termasuk saat `q` cocok dengan emailnya.
+5. `PATCH /api/admin/users/{id}/tier` `{"userType":"VIP_YEARLY"}` -> 200 dengan tier baru; ulangi -> 200 tanpa log baru; `{"userType":"ADMIN"}` -> 400; id admin / id acak -> 404; token ROLE_USER -> 403.
+6. Setelah tier user diubah, buat generasi AI sebagai user itu: kuota/tier mengikuti tier baru tanpa login ulang. Cek `activity_log` berisi `USER_TIER_CHANGED:...`.
+
+
+## 34. Fitur Admin: menu User -- daftar berpaginasi, cari email/nama, filter tier, ubah tier (Pigay, frontend)
+
+Mengikuti kontrak backend bagian 33 (`GET /api/admin/users`, `PATCH /api/admin/users/{id}/tier`). Semua kode di `frontend/src/modules/admin/`. Menu "User" di sidebar sebelumnya halaman "Coming soon"; sekarang halaman nyata (`/admin/users`, route `admin-users`).
+
+**Halaman `views/AdminUserListView.vue`:**
+- Tabel Nama / Email / Tier / Status / Dibuat, 10 baris per halaman (`AdminPager` dipakai ulang). Akun admin tidak pernah tampil (disaring backend). Status: Aktif, Belum verifikasi, Nonaktif.
+- **Cari** (nama atau email): jeda 400 ms setelah berhenti mengetik; Enter langsung mencari; tombol hapus (x). Maksimal 100 karakter. **Filter tier**: dropdown "Semua tier / Free / VIP Monthly / VIP Yearly". Keduanya digabung. Setiap filter berubah, halaman kembali ke 1.
+- Filter dan halaman disimpan di URL (`?q=budi&tier=FREE&page=2`, halaman mulai dari 1): refresh dan tombol Back menampilkan hasil yang sama, dan kotak cari ikut tersinkron saat Back/Forward. Pencarian memakai `replace` (riwayat Back tidak penuh ketikan), dropdown tier memakai `push`.
+- **Ubah tier**: dropdown di tiap baris; memilih tier baru membuka dialog konfirmasi (dropdown dikembalikan ke tier semula sampai dikonfirmasi, jadi batal = tidak ada perubahan). Setelah sukses daftar dimuat ulang dengan filter yang sama dan notifikasi menyebut nama user; bila user tidak lagi cocok dengan filter tier aktif, notifikasi menjelaskannya. Error 400/404 tampil sebagai pesan (404 juga memuat ulang).
+- State memuat, kosong ("Belum ada user" vs "Tidak ada user yang cocok" + tombol "Hapus filter"), dan gagal (tombol "Coba lagi"). Respons lama yang terlambat tidak menimpa hasil baru; halaman di luar jangkauan pindah ke halaman terakhir; pager dan dropdown terkunci selama memuat/menyimpan.
+
+**Berkas baru:** `types/admin-user.types.ts` (`UserTier`, `UserListItem`, `UserListPage`, `UpdateUserTierRequest`, `UserListFilters`; nama field = DTO backend), `services/adminUser.service.ts`, `utils/adminUser.ts` (logika murni), `views/AdminUserListView.vue`.
+**Diubah:** `routes.ts` (`admin-users` memakai `AdminUserListView`; `admin-user-logs`, `admin-payments`, `admin-ai-token-usage` tetap Coming soon).
+**Catatan:** pilihan tier ditulis tetap di FE (`USER_TIERS`, sama dengan seeder backend) karena `GET /api/user-types` hanya bisa diakses ROLE_USER. `utils/adminUser.ts` menduplikasi dua fungsi kecil dari `adminList.ts` karena Node tanpa bundler tidak bisa mengimpor nilai relatif tanpa ekstensi; `adminUser.test.ts` menjaga keduanya tetap sama.
+
+**Test:** `adminUser.test.ts` (baru, 16); `adminRoutes` dan `guards` diperluas. Total 71 test Node lulus; 11 mutasi (filter tier tidak valid, `q`/`tier` selalu terkirim, batas 100 karakter, tier sama dianggap perubahan, prioritas status nonaktif, catatan filter, pilihan tier ADMIN, halaman tidak direset saat filter berubah, dropdown tidak dikembalikan, route kembali ke Coming soon) semuanya tertangkap.
+
+**Verifikasi:** type-check strict (shim) bersih kecuali 4 artefak lama shim, pemeriksa template 14 berkas `.vue` admin bersih. **`npm run build`/`vue-tsc -b` dan tampilan browser TIDAK dapat dijalankan di lingkungan ini (registry npm diblokir)**; jalankan `npm test` dan `npm run build` sebelum merge. Perilaku debounce, sinkronisasi kotak cari saat Back, dan dropdown yang dikembalikan hanya terverifikasi lewat pembacaan kode, bukan di browser.
+
+**Cek manual (backend bagian 33 harus sudah jalan):**
+1. Menu User di sidebar membuka daftar user (tanpa akun admin), 10 per halaman, terbaru dulu; pager bekerja dan `?page=2` bertahan setelah refresh.
+2. Ketik "budi" di kotak cari: tabel diperbarui sekitar setengah detik setelah berhenti mengetik, URL menjadi `?q=budi`; Enter mencari langsung; tombol x menghapus. Ketik `%` atau `_`: hanya user yang benar-benar mengandung karakter itu.
+3. Pilih filter "Free" lalu cari: keduanya berlaku (AND), halaman kembali ke 1. Klik Back: filter dan kotak cari ikut kembali. "Hapus filter" mengosongkan keduanya.
+4. Ubah tier user lewat dropdown baris: dialog konfirmasi muncul; Batal mengembalikan pilihan; Ubah tier menyimpan dan notifikasi tampil. Dengan filter "Free" aktif, ubah ke VIP: baris hilang dan notifikasi menjelaskan alasannya.
+5. Setelah tier user diubah, user itu langsung mendapat kuota/tier baru tanpa login ulang (lihat CHANGES bagian 33 langkah 6).

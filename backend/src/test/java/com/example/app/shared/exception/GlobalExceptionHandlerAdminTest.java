@@ -4,7 +4,10 @@ package com.example.app.shared.exception;
 import com.example.app.modules.admin.exception.AccountDeactivatedException;
 import com.example.app.modules.admin.exception.AdminNotFoundException;
 import com.example.app.modules.admin.exception.CannotDeactivateSelfException;
+import com.example.app.modules.admin.exception.InvalidUserQueryException;
+import com.example.app.modules.admin.exception.InvalidUserTierException;
 import com.example.app.modules.admin.exception.LastActiveAdminException;
+import com.example.app.modules.admin.exception.UserNotFoundException;
 import com.example.app.modules.auth.exception.AccountNotVerifiedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -57,5 +60,14 @@ class GlobalExceptionHandlerAdminTest {
         for (ResponseEntity<Map<String, Object>> r : java.util.List.of(self, last, missing)) {
             assertFalse(r.getBody().containsKey("code"));
         }
+    }
+
+    @Test
+    void userManagementErrorsMapToTheirStatuses() {
+        assertBody(handler.handleUserNotFound(new UserNotFoundException()), 404, "User tidak ditemukan.");
+        assertBody(handler.handleInvalidUserTier(new InvalidUserTierException()), 400,
+                "Tier tidak valid. Pilih FREE, VIP_MONTHLY, atau VIP_YEARLY.");
+        assertBody(handler.handleInvalidUserQuery(new InvalidUserQueryException(100)), 400,
+                "Kata kunci pencarian maksimal 100 karakter.");
     }
 }

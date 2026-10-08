@@ -90,3 +90,11 @@ test('daftar admin: hanya ADMIN yang boleh; tamu & user biasa dialihkan', () => 
   assert.deepEqual(resolveGuard(page, none), { name: 'admin-signin' });
   assert.deepEqual(resolveGuard(page, expired), { name: 'admin-signin', query: { expired: 'true' } });
 });
+
+test('menu User: hanya ADMIN yang boleh; tamu & user biasa dialihkan', () => {
+  const page = adminPage('admin-users');
+  assert.equal(resolveGuard(page, admin), true);
+  assert.deepEqual(resolveGuard(page, user), { name: 'dashboard' });
+  assert.deepEqual(resolveGuard(page, none), { name: 'admin-signin' });
+  assert.deepEqual(resolveGuard(page, expired), { name: 'admin-signin', query: { expired: 'true' } });
+});
