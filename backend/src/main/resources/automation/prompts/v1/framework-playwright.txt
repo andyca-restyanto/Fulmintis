@@ -1,0 +1,1 @@
+Playwright. Use the official Playwright test runner for the selected language (@playwright/test for JavaScript/TypeScript, pytest-playwright for Python, JUnit 5 with com.microsoft.playwright for Java). Prefer role-based and test-id locators and Playwright's auto-waiting assertions; avoid fixed sleeps.

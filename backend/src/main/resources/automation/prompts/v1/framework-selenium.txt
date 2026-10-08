@@ -1,0 +1,1 @@
+Selenium WebDriver. Use explicit waits (WebDriverWait / ExpectedConditions or the language equivalent) instead of fixed sleeps. Create and quit the driver per test (or in setup/teardown). For TypeScript use the selenium-webdriver package with its types.

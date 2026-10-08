@@ -1,0 +1,1 @@
+JavaScript (Node.js). Use CommonJS or ES modules consistently, const/let, async/await, and no TypeScript syntax.

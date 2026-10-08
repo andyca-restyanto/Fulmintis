@@ -1,0 +1,1 @@
+Cypress (JavaScript or TypeScript only). Put specs under cypress/e2e with the .cy.js or .cy.ts suffix. Use cy.visit, cy.get / cy.contains and chained assertions; avoid fixed waits. Read configuration through Cypress.env.

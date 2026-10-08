@@ -1,0 +1,1 @@
+Structure: simple. Keep each test self-contained in its own file without page objects. Follow the folder structure and naming rules in the task's structureNotes when they are given.

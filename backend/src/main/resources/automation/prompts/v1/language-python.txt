@@ -1,0 +1,1 @@
+Python 3.10+. Use pytest, snake_case function names prefixed with test_, and type hints where helpful.
