@@ -1,9 +1,6 @@
-# filepath: /backend/.dockerignore
 target/
-.mvn/
+.idea/
+.vscode/
+*.iml
 .env
-.env.*
-!.env.example
-src/main/resources/application-local.properties
-*.class
-HELP.md
+*.log
