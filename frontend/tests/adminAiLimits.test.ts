@@ -157,3 +157,24 @@ test('route, menu, dan view terpasang', () => {
   assert.match(svc, /'\/admin\/ai-limits'/);
   assert.match(svc, /indexes: null/);
 });
+
+test('nilai bawaan di luar rentang yang TIDAK diubah tidak menghalangi simpan; yang diubah tetap diperiksa', async () => {
+  const m = await import('../src/modules/admin/utils/adminAiLimits.ts');
+  const tier = (d: number, timeout: number) => ({
+    automation: { dailyLimit: d, maxTestCases: 5, maxOutputTokens: 4096, timeoutSeconds: timeout },
+    testcase: { dailyLimit: d, maxDrafts: 3, maxOutputTokens: 4096, timeoutSeconds: 90 },
+  });
+  // timeout 5 detik (dari environment) < min 10 pada form
+  const limits = {
+    global: { dailyLimit: 0, quotaCircuitMinutes: 10 },
+    tiers: { FREE: tier(3, 5), VIP_MONTHLY: tier(30, 180), VIP_YEARLY: tier(30, 180) },
+  };
+  const form = m.formFromLimits(limits as never);
+  assert.notDeepEqual(m.validateForm(form), {}); // tanpa limits: diblokir (perilaku lama)
+  assert.deepEqual(m.validateForm(form, limits as never), {});
+  form['FREE.AUTOMATION_DAILY_LIMIT'] = '10';
+  assert.deepEqual(m.validateForm(form, limits as never), {});
+  assert.equal(m.buildUpdateRequest(form, false, limits as never).tiers.FREE.automation.dailyLimit, 10);
+  form['FREE.AUTOMATION_TIMEOUT_SECONDS'] = '7'; // diubah tetapi masih di luar rentang
+  assert.ok(m.validateForm(form, limits as never)['FREE.AUTOMATION_TIMEOUT_SECONDS']);
+});

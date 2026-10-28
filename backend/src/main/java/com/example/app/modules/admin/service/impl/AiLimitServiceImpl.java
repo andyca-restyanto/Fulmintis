@@ -83,11 +83,13 @@ public class AiLimitServiceImpl implements AiLimitService {
         for (Map.Entry<String, Integer> e : desired.entrySet()) {
             AiLimitKey key = AiLimitKey.fromStorageKey(e.getKey()).orElseThrow();
             int value = e.getValue();
+            int current = limits.value(e.getKey().substring(0, e.getKey().indexOf('.')), key);
+            // Nilai yang tidak diubah dilewati SEBELUM cek rentang: nilai bawaan dari environment boleh di luar rentang
+            // menu ini, dan itu tidak boleh menggagalkan perubahan nilai lain.
+            if (current == value) continue;
             if (!key.accepts(value)) {
                 throw new InvalidAiLimitException(label(e.getKey()) + " harus antara " + key.min() + " dan " + key.max() + ".");
             }
-            int current = limits.value(e.getKey().substring(0, e.getKey().indexOf('.')), key);
-            if (current == value) continue;
             if (value == 0 && key.unlimitedAtZero() && !request.isConfirmUnlimited()) {
                 throw new InvalidAiLimitException(label(e.getKey())
                         + ": nilai 0 berarti TANPA BATAS (biaya AI tidak terkendali). Centang konfirmasi untuk melanjutkan.");

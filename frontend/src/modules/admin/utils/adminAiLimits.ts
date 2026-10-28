@@ -111,15 +111,22 @@ export function parseLimitValue(text: string): number | null {
   return Number(t);
 }
 
-/** Pesan error per kunci form; objek kosong = form valid. */
-export function validateForm(form: AiLimitsForm): Record<string, string> {
+/**
+ * Pesan error per kunci form; objek kosong = form valid.
+ * Bila `limits` diberikan, nilai yang TIDAK diubah admin tidak diperiksa rentangnya: nilai bawaan dari environment
+ * server bisa saja di luar rentang form, dan itu tidak boleh menghalangi admin mengubah nilai lain.
+ */
+export function validateForm(form: AiLimitsForm, limits?: Values): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const key of allLimitKeys()) {
-    const { fieldId } = splitKey(key);
+    const { scope, fieldId } = splitKey(key);
     const field = fieldOf(fieldId);
     const value = parseLimitValue(form[key] ?? '');
     if (value === null) errors[key] = 'Isi dengan bilangan bulat (tanpa minus atau desimal).';
-    else if (value < field.min || value > field.max) errors[key] = `Harus antara ${field.min} dan ${field.max}.`;
+    else if (value < field.min || value > field.max) {
+      if (limits && value === readValue(limits, scope, fieldId)) continue;
+      errors[key] = `Harus antara ${field.min} dan ${field.max}.`;
+    }
   }
   return errors;
 }
@@ -147,8 +154,8 @@ export function unlimitedChanges(form: AiLimitsForm, limits: Values): string[] {
 }
 
 /** Body PUT dari form yang SUDAH valid (validateForm kosong). */
-export function buildUpdateRequest(form: AiLimitsForm, confirmUnlimited: boolean): AiLimitsUpdateRequest {
-  const errors = validateForm(form);
+export function buildUpdateRequest(form: AiLimitsForm, confirmUnlimited: boolean, limits?: Values): AiLimitsUpdateRequest {
+  const errors = validateForm(form, limits);
   if (Object.keys(errors).length > 0) throw new Error('Form batas AI belum valid');
   const num = (scope: string, fieldId: string): number => parseLimitValue(form[limitKey(scope, fieldId)]) as number;
 

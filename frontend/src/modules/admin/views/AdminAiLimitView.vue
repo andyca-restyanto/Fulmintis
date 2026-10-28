@@ -35,7 +35,7 @@ const notice = ref('');
 const showErrors = ref(false);
 const confirm = ref<'unlimited' | 'reset-all' | null>(null);
 
-const errors = computed(() => validateForm(form.value));
+const errors = computed(() => validateForm(form.value, limits.value ?? undefined));
 const isDirty = computed(() => (limits.value ? isFormDirty(form.value, limits.value) : false));
 const overridden = computed(() => (limits.value ? overriddenKeys(limits.value) : []));
 const pendingUnlimited = computed(() => (limits.value ? unlimitedChanges(form.value, limits.value) : []));
@@ -81,7 +81,12 @@ async function save(confirmUnlimited: boolean) {
   actionError.value = '';
   notice.value = '';
   showErrors.value = true;
-  if (Object.keys(errors.value).length > 0) return;
+  const invalid = Object.keys(errors.value);
+  if (invalid.length > 0) {
+    // Jangan gagal diam-diam: kolom bermasalah bisa berada jauh di bawah (tabel tier lain).
+    actionError.value = `Belum bisa disimpan, periksa: ${invalid.map(limitLabel).join('; ')}.`;
+    return;
+  }
   if (pendingUnlimited.value.length > 0 && !confirmUnlimited) {
     confirm.value = 'unlimited';
     return;
@@ -89,7 +94,7 @@ async function save(confirmUnlimited: boolean) {
 
   isBusy.value = true;
   try {
-    applyServerState(await adminAiLimitService.update(buildUpdateRequest(form.value, confirmUnlimited)));
+    applyServerState(await adminAiLimitService.update(buildUpdateRequest(form.value, confirmUnlimited, limits.value ?? undefined)));
     notice.value = 'Batas AI disimpan dan langsung berlaku.';
   } catch (err) {
     actionError.value = readAdminError(err, 'Gagal menyimpan batas AI.').message;
