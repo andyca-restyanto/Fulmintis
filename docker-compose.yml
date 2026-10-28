@@ -3,11 +3,13 @@ services:
     build: ./backend
     container_name: fulmintis-backend
     restart: unless-stopped
-    env_file: .env                            # kredensial master_data & frontline dibaca dari .env di server
+    env_file: .env                            # kredensial DB & SMTP dibaca dari .env di server
     extra_hosts:
       - "host.docker.internal:host-gateway"   # akses PostgreSQL yang terinstall di host VPS
     expose:
       - "8080"                                # internal saja, TIDAK dibuka ke internet
+    volumes:
+      - /opt/fulmintis-data/uploads:/var/data/frontline-uploads   # upload evidence persisten (tidak hilang saat redeploy)
     networks: [fulmintis]
 
   frontend:
@@ -17,6 +19,9 @@ services:
     depends_on: [backend]
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # sertifikat HTTPS dari Certbot di host (read-only)
     networks: [fulmintis]
 
 networks:
