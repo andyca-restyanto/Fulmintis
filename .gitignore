@@ -12,3 +12,13 @@ dist/
 target/
 .idea/
 .DS_Store
+# Tambahkan baris-baris ini ke .gitignore di ROOT repo Fulmintis
+.env
+backend/target/
+frontend/node_modules/
+frontend/dist/
+# Tambahkan baris-baris ini ke .gitignore di ROOT repo Fulmintis
+.env
+backend/target/
+frontend/node_modules/
+frontend/dist/
