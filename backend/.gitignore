@@ -1,0 +1,9 @@
+# backend/.gitignore
+.env
+.env.*
+!.env.example
+src/main/resources/application-local.properties
+target/
+*.class
+.mvn/
+HELP.md
