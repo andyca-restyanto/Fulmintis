@@ -11,7 +11,7 @@ test('menu Admin berada PERTAMA, sebelum menu User', () => {
   const labels = ADMIN_MENU.map((m) => m.label);
   assert.equal(labels[0], 'Admin');
   assert.ok(labels.indexOf('Admin') < labels.indexOf('User'));
-  assert.deepEqual(labels, ['Admin', 'User', 'Log user', 'Payment', 'AI token used', 'Batas AI']);
+  assert.deepEqual(labels, ['Admin', 'User', 'Log user', 'Payment', 'AI token used', 'Batas AI', 'Email Diizinkan']);
 });
 
 test('setiap menu menunjuk route admin yang ada, begitu juga route turunannya', () => {

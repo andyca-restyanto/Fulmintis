@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { authService } from '../services/auth.service';
 import type { RegisterRequest, ApiValidationErrorResponse } from '../types/register.types';
+import { mapRegisterError } from '../utils/registerErrors';
 import { usePasswordValidation } from '../composables/usePasswordValidation';
 import PasswordChecklist from '../components/PasswordChecklist.vue';
 import AuthTabs from '../components/AuthTabs.vue';
@@ -115,14 +116,9 @@ async function handleSubmit() {
     form.value = { email: '', password: '', confirmPassword: '' };
   } catch (err) {
     if (axios.isAxiosError<ApiValidationErrorResponse>(err)) {
-      const data = err.response?.data;
-      if (err.response?.status === 400 && data?.errors) {
-        serverErrors.value = data.errors;
-      } else if (err.response?.status === 409) {
-        generalError.value = data?.message ?? 'Email sudah terdaftar';
-      } else {
-        generalError.value = data?.message ?? 'Terjadi kesalahan, coba lagi';
-      }
+      const mapped = mapRegisterError(err.response?.status, err.response?.data);
+      serverErrors.value = mapped.fieldErrors;
+      generalError.value = mapped.general;
     } else {
       generalError.value = 'Tidak dapat terhubung ke server';
     }

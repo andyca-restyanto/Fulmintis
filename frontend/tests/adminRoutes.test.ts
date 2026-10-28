@@ -61,7 +61,7 @@ test('semua route area admin mewarisi requiresAuth + role ADMIN dari induknya', 
   assert.deepEqual(
     childNames.sort(),
     [
-      'admin-admins', 'admin-ai-limits', 'admin-ai-token-usage', 'admin-change-password', 'admin-dashboard', 'admin-invite',
+      'admin-admins', 'admin-ai-limits', 'admin-ai-token-usage', 'admin-change-password', 'admin-dashboard', 'admin-email-allowlist', 'admin-invite',
       'admin-payments', 'admin-user-logs', 'admin-users',
     ]
   );

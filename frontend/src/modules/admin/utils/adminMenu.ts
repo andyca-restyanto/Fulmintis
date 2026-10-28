@@ -1,7 +1,7 @@
 // filepath: /frontend/src/modules/admin/utils/adminMenu.ts
 
 /** Kunci ikon (komponen ikon dipetakan di AdminSidebar.vue; berkas ini sengaja bebas dari .vue agar bisa diuji). */
-export type AdminMenuIconKey = 'shield' | 'users' | 'activity' | 'credit-card' | 'sparkles' | 'sliders';
+export type AdminMenuIconKey = 'shield' | 'users' | 'activity' | 'credit-card' | 'sparkles' | 'sliders' | 'mail';
 
 export interface AdminMenuEntry {
   routeName: string;
@@ -19,6 +19,7 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
   { routeName: 'admin-payments', label: 'Payment', icon: 'credit-card' },
   { routeName: 'admin-ai-token-usage', label: 'AI token used', icon: 'sparkles' },
   { routeName: 'admin-ai-limits', label: 'Batas AI', icon: 'sliders' },
+  { routeName: 'admin-email-allowlist', label: 'Email Diizinkan', icon: 'mail' },
 ];
 
 export function isMenuActive(entry: AdminMenuEntry, currentRouteName: string | symbol | null | undefined): boolean {

@@ -99,6 +99,13 @@ const adminRoutes: RouteRecordRaw[] = [
         meta: { title: 'Batas AI' },
       },
       {
+        // Menu Email Diizinkan: batasi email yang boleh register (email persis / seluruh domain).
+        path: 'email-allowlist',
+        name: 'admin-email-allowlist',
+        component: () => import('./views/AdminEmailAllowlistView.vue'),
+        meta: { title: 'Email Diizinkan' },
+      },
+      {
         path: 'ai-token-usage',
         name: 'admin-ai-token-usage',
         component: () => import('./views/ComingSoonView.vue'),

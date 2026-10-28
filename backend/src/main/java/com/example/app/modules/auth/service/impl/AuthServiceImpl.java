@@ -20,6 +20,7 @@ import com.example.app.modules.auth.exception.InvalidOrExpiredResetTokenExceptio
 import com.example.app.modules.auth.repository.UserRepository;
 import com.example.app.modules.auth.service.AuthService;
 import com.example.app.modules.auth.service.EmailVerificationResult;
+import com.example.app.modules.emailallowlist.service.EmailAllowlistService;
 import com.example.app.modules.usertype.UserTypeCode;
 import com.example.app.modules.usertype.entity.UserType;
 import com.example.app.modules.usertype.repository.UserTypeRepository;
@@ -47,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final ActivityLogService activityLogService;
     private final UserTypeRepository userTypeRepository;
+    private final EmailAllowlistService emailAllowlistService;
 
     @Value("${app.backend.base-url}")
     private String backendBaseUrl;
@@ -64,6 +66,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public RegisterResponseDTO register(RegisterRequestDTO request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
+
+        // Pembatasan email register (menu admin "Email Diizinkan"). Dicek PERTAMA, sebelum cek duplikat,
+        // supaya email di luar daftar tidak bisa dipakai menebak akun yang sudah ada.
+        emailAllowlistService.assertAllowed(normalizedEmail);
 
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new EmailAlreadyExistsException(normalizedEmail);

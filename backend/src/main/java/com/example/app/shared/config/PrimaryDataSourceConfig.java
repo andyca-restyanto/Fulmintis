@@ -34,6 +34,7 @@ import javax.sql.DataSource;
                 "com.example.app.modules.testrun.repository",
                 "com.example.app.modules.automation.repository",
                 "com.example.app.modules.admin.repository",
+                "com.example.app.modules.emailallowlist.repository",
                 "com.example.app.shared.activitylog"
         },
         entityManagerFactoryRef = "primaryEntityManagerFactory",
@@ -55,6 +56,7 @@ public class PrimaryDataSourceConfig {
             "com.example.app.modules.testrun.entity",
             "com.example.app.modules.automation.entity",
             "com.example.app.modules.admin.entity",
+            "com.example.app.modules.emailallowlist.entity",
             "com.example.app.shared.activitylog"
     };
 

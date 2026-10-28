@@ -9,6 +9,7 @@ import ActivityIcon from '@/shared/components/icons/ActivityIcon.vue';
 import CreditCardIcon from '@/shared/components/icons/CreditCardIcon.vue';
 import SparklesIcon from '@/shared/components/icons/SparklesIcon.vue';
 import SlidersIcon from '@/shared/components/icons/SlidersIcon.vue';
+import MailIcon from '@/shared/components/icons/MailIcon.vue';
 
 const route = useRoute();
 
@@ -21,6 +22,7 @@ const ICONS: Record<AdminMenuIconKey, Component> = {
   'credit-card': CreditCardIcon,
   sparkles: SparklesIcon,
   sliders: SlidersIcon,
+  mail: MailIcon,
 };
 </script>
 

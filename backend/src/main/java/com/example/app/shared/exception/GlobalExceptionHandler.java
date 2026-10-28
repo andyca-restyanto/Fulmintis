@@ -5,6 +5,10 @@ import com.example.app.modules.project.exception.CollaborationNotFoundException;
 import com.example.app.modules.project.exception.LastOwnerException;
 import com.example.app.modules.testrun.exception.TestResultConflictException;
 import com.example.app.modules.admin.exception.AccountDeactivatedException;
+import com.example.app.modules.emailallowlist.exception.AllowlistRuleNotFoundException;
+import com.example.app.modules.emailallowlist.exception.DuplicateAllowlistRuleException;
+import com.example.app.modules.emailallowlist.exception.EmailNotAllowedException;
+import com.example.app.modules.emailallowlist.exception.InvalidAllowlistRuleException;
 import com.example.app.modules.admin.exception.AdminNotFoundException;
 import com.example.app.modules.admin.exception.AdminRegistrationClosedException;
 import com.example.app.modules.admin.exception.CannotDeactivateSelfException;
@@ -66,6 +70,26 @@ public class GlobalExceptionHandler {
         body.put("errors", errors);
 
         return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(EmailNotAllowedException.class)
+    public ResponseEntity<Map<String, Object>> handleEmailNotAllowed(EmailNotAllowedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), EmailNotAllowedException.CODE);
+    }
+
+    @ExceptionHandler(InvalidAllowlistRuleException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidAllowlistRule(InvalidAllowlistRuleException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateAllowlistRuleException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateAllowlistRule(DuplicateAllowlistRuleException ex) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(AllowlistRuleNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleAllowlistRuleNotFound(AllowlistRuleNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(AdminRegistrationClosedException.class)

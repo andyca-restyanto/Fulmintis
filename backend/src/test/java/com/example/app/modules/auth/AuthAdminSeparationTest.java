@@ -49,7 +49,8 @@ class AuthAdminSeparationTest {
         jwtService = AdminTestSupport.jwtService();
         service = new AuthServiceImpl(
                 userRepository, AdminTestSupport.ENCODER, emailService, jwtService,
-                mock(ActivityLogService.class), AdminTestSupport.userTypeRepositoryWithAllTypes());
+                mock(ActivityLogService.class), AdminTestSupport.userTypeRepositoryWithAllTypes(),
+                mock(com.example.app.modules.emailallowlist.service.EmailAllowlistService.class));
         ReflectionTestUtils.setField(service, "backendBaseUrl", "http://localhost:8080");
         ReflectionTestUtils.setField(service, "frontendBaseUrl", "http://localhost:5173");
         ReflectionTestUtils.setField(service, "verificationTokenExpiryMinutes", 1440L);

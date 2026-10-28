@@ -64,7 +64,8 @@ class AdminPasswordFlowTest {
 
         authService = new AuthServiceImpl(
                 userRepository, AdminTestSupport.ENCODER, emailService, jwtService,
-                activityLogService, AdminTestSupport.userTypeRepositoryWithAllTypes());
+                activityLogService, AdminTestSupport.userTypeRepositoryWithAllTypes(),
+                mock(com.example.app.modules.emailallowlist.service.EmailAllowlistService.class));
         ReflectionTestUtils.setField(authService, "backendBaseUrl", "http://localhost:8080");
         ReflectionTestUtils.setField(authService, "frontendBaseUrl", "http://localhost:5173");
         ReflectionTestUtils.setField(authService, "verificationTokenExpiryMinutes", 1440L);

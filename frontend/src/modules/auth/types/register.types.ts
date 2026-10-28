@@ -17,5 +17,7 @@ export interface ApiValidationErrorResponse {
   timestamp: string;
   status: number;
   message: string;
+  /** Pembeda mesin, mis. 'EMAIL_NOT_ALLOWED' (403 saat email tidak ada di daftar izin). */
+  code?: string;
   errors?: Record<string, string>;
 }
