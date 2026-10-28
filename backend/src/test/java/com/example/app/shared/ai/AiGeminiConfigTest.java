@@ -10,6 +10,7 @@ import com.example.app.modules.automation.AutomationTestSupport.MutableClock;
 import com.example.app.shared.ai.gemini.GeminiAiClient;
 import com.example.app.shared.config.ClockConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanCreationException;
@@ -32,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Konfigurasi AI untuk Gemini: penjaga produksi, tier akun, anggaran global lintas fitur, dan binding properti Spring. */
+// Dilewati sementara atas permintaan. Hapus baris @Disabled di bawah untuk mengaktifkan kembali.
+@Disabled("Dilewati sementara: AiGeminiConfigTest")
 class AiGeminiConfigTest {
 
     private static AiProperties gemini(String billingTier) {

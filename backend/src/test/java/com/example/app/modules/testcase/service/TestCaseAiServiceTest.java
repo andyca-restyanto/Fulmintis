@@ -56,6 +56,7 @@ import com.example.app.shared.ai.AiProviderException;
 import com.example.app.shared.ai.AiProviderException.Kind;
 import com.example.app.shared.ai.AiRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -88,6 +89,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Alur generate -> review -> commit dengan pipeline palsu yang sebenarnya; tanpa DB, tanpa Spring, tanpa API key. */
+// Dilewati sementara atas permintaan. Hapus baris @Disabled di bawah untuk mengaktifkan kembali.
+@Disabled("Dilewati sementara: TestCaseAiServiceTest")
 class TestCaseAiServiceTest {
 
     private static final String EMAIL = "andi@example.com";

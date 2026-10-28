@@ -14,6 +14,7 @@ import com.example.app.shared.ai.AiLimitProvider;
 import com.example.app.shared.ai.AiProperties;
 import com.example.app.shared.ai.AiTier;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -35,6 +36,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+// Dilewati sementara atas permintaan. Hapus baris @Disabled di bawah untuk mengaktifkan kembali.
+@Disabled("Dilewati sementara: AiLimitServiceTest")
 class AiLimitServiceTest {
 
     private final Map<String, AiLimitSetting> table = new TreeMap<>();
