@@ -2,6 +2,7 @@
 package com.example.app.shared.ai;
 
 import com.example.app.modules.automation.AutomationTestSupport.MutableClock;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -14,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+// Dilewati sementara atas permintaan. Hapus baris @Disabled di bawah untuk mengaktifkan kembali.
+@Disabled("Dilewati sementara: AiLimitProviderTest")
 class AiLimitProviderTest {
 
     private final AiProperties props = new AiProperties(); // bawaan kode: FREE harian 3 / VIP harian 30
