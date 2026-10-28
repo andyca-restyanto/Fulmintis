@@ -5,13 +5,13 @@
 -- (spring.jpa.hibernate.ddl-auto=update) saat aplikasi start.
 
 ALTER TABLE project
-    ADD COLUMN created_by VARCHAR(255) NOT NULL,
-    ADD COLUMN updated_by VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255) NOT NULL DEFAULT 'system',
+    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);
 
 ALTER TABLE project_collaboration
-    ADD COLUMN created_by VARCHAR(255) NOT NULL,
-    ADD COLUMN updated_at TIMESTAMP,
-    ADD COLUMN updated_by VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255) NOT NULL DEFAULT 'system',
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);
 
 -- Catatan operasional: kalau tabel ini SUDAH ada isinya (dari testing
 -- sebelumnya), Hibernate ddl-auto=update TIDAK otomatis mem-backfill
@@ -20,3 +20,6 @@ ALTER TABLE project_collaboration
 --   -- atau backfill manual:
 --   UPDATE project SET created_by = 'system' WHERE created_by IS NULL;
 --   UPDATE project_collaboration SET created_by = 'system' WHERE created_by IS NULL;
+
+ALTER TABLE project ALTER COLUMN created_by DROP DEFAULT;
+ALTER TABLE project_collaboration ALTER COLUMN created_by DROP DEFAULT;

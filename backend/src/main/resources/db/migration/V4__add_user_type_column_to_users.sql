@@ -10,7 +10,9 @@
 -- key lintas database.
 
 ALTER TABLE users
-    ADD COLUMN user_type VARCHAR(50) NOT NULL;
+    ADD COLUMN IF NOT EXISTS user_type VARCHAR(50) NOT NULL DEFAULT 'Free';
+ALTER TABLE users
+    ALTER COLUMN user_type DROP DEFAULT;
 
 -- Catatan operasional: kalau tabel users SUDAH ada isinya sebelum kolom ini
 -- ditambahkan, Hibernate ddl-auto=update TIDAK otomatis mem-backfill nilai
