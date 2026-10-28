@@ -1,0 +1,1 @@
+TypeScript. Use strict, explicit types where helpful, async/await and ES module imports. Do not use the any type unless unavoidable.

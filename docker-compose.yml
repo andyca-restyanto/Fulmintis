@@ -1,0 +1,83 @@
+# filepath: /docker-compose.yml
+# Produksi: docker compose --env-file .env up -d --build
+# Rahasia HANYA di file .env (tidak di-commit). Lihat .env.example dan DEPLOY.md.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:?isi DB_USERNAME di .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di .env}
+      POSTGRES_DB: frontline
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/01-init-master-data.sh:/docker-entrypoint-initdb.d/01-init-master-data.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d frontline"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Tidak ada "ports": database hanya terjangkau dari jaringan compose.
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # Dikunci eksplisit: skema produksi dibuat/diubah Flyway (ddl-auto=validate). Jangan dimatikan.
+      SPRING_FLYWAY_ENABLED: "true"
+      DB_URL: jdbc:postgresql://db:5432/frontline
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      MASTER_DB_URL: jdbc:postgresql://db:5432/master_data
+      MASTER_DB_USERNAME: ${DB_USERNAME}
+      MASTER_DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET (min 32 karakter acak)}
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:?isi PUBLIC_URL, mis. https://app.domainanda.com}
+      FRONTEND_BASE_URL: ${PUBLIC_URL}
+      BACKEND_BASE_URL: ${PUBLIC_URL}
+      RATE_LIMIT_TRUST_FORWARD_HEADERS: ${RATE_LIMIT_TRUST_FORWARD_HEADERS:-true}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:?isi MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?isi MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM:?isi MAIL_FROM}
+      BRAND_NAME: ${BRAND_NAME:-Fulmintis}
+      STORAGE_BASE_DIR: /var/data/frontline-uploads
+      # AI: kosongkan AI_PROVIDER untuk menonaktifkan fitur Generate.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_BILLING_TIER: ${AI_BILLING_TIER:-free}
+      AI_FREE_MODEL: ${AI_FREE_MODEL:-}
+      AI_VIP_MODEL: ${AI_VIP_MODEL:-}
+      AI_GLOBAL_DAILY_LIMIT: ${AI_GLOBAL_DAILY_LIMIT:-0}
+    volumes:
+      - uploads:/var/data/frontline-uploads
+    healthcheck:
+      # Endpoint publik yang menyentuh database.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/admin/auth/registration-status >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # Default hanya loopback: pasang reverse proxy TLS (Caddy/Nginx host/Cloudflare) di depannya.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+
+volumes:
+  pgdata:
+  uploads:

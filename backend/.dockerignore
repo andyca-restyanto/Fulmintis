@@ -1,0 +1,9 @@
+# filepath: /backend/.dockerignore
+target/
+.mvn/
+.env
+.env.*
+!.env.example
+src/main/resources/application-local.properties
+*.class
+HELP.md

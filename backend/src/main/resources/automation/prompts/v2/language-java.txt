@@ -1,0 +1,1 @@
+Java 17+. Use JUnit 5, one test class per test case under src/test/java, a descriptive @Test method name and @DisplayName with the test case title.

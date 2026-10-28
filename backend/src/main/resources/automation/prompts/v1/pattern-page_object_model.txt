@@ -1,0 +1,1 @@
+Structure: Page Object Model. Put page classes in a pages directory and keep locators and page actions in them; tests only call page methods and assert. Follow the folder structure and naming rules in the task's structureNotes when they are given.
